@@ -17,7 +17,6 @@ public class FXTest {
                 try {
                     block.invoke();
                 } catch (Exception e) {
-                    e.printStackTrace();
                     throw new RuntimeException(e);
                 }
             });
@@ -26,11 +25,10 @@ public class FXTest {
 
     public static void it(String text, Invokable block) {
         StaticRunnerSupport.it(text, () -> {
-            PlatformImpl.startup(() -> {
+            PlatformImpl.runAndWait(() -> {
                 try {
                     block.invoke();
                 } catch (Exception e) {
-                    e.printStackTrace();
                     throw new RuntimeException(e);
                 }
             });
