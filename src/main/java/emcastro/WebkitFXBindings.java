@@ -4,9 +4,13 @@ import javafx.scene.web.WebEngine;
 import netscape.javascript.JSException;
 import netscape.javascript.JSObject;
 
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.InputStreamReader;
 import java.lang.reflect.InvocationHandler;
 import java.lang.reflect.Method;
 import java.lang.reflect.Proxy;
+import java.net.URL;
 
 /**
  * Created by ecastro on 04/12/16.
@@ -23,13 +27,37 @@ public class WebkitFXBindings {
         }
     };
 
-    JSObject function;
-    Object[] empty = new Object[0];
-    String undefined;
+    private final JSObject function;
+    private final Object[] empty = new Object[0];
+    private final String undefined;
+    private final WebEngine engine;
 
     public WebkitFXBindings(WebEngine engine) {
         function = (JSObject) engine.executeScript("Function");
         undefined = (String) engine.executeScript("undefined");
+        this.engine = engine;
+    }
+
+    public <T> T executeScript(Class<T> type, URL script) throws IOException {
+        return executeScript(type, script.openStream());
+    }
+
+    public <T> T executeScript(Class<T> type, InputStream script) throws IOException {
+        StringBuilder b = new StringBuilder();
+
+        char[] buffer = new char[1000];
+        InputStreamReader reader = new InputStreamReader(script);
+        int sz;
+        while ((sz = reader.read(buffer)) != -1) {
+            b.append(buffer, 0, sz);
+        }
+        reader.close();
+
+        return executeScript(type, b.toString());
+    }
+
+    public <T> T executeScript(Class<T> type, String script) {
+        return proxy(type, engine.executeScript(script));
     }
 
     public <T> T proxy(Class<T> type, Object o) {

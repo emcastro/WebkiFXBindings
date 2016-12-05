@@ -6,9 +6,7 @@ import javafx.scene.web.WebView;
 import netscape.javascript.JSObject;
 import org.junit.runner.RunWith;
 
-import java.nio.file.Files;
-import java.nio.file.Paths;
-
+import static com.mscharhag.oleaster.matcher.Matchers.expect;
 import static emcastro.util.FXTest.describe;
 import static emcastro.util.FXTest.it;
 
@@ -19,69 +17,80 @@ import static emcastro.util.FXTest.it;
 @RunWith(OleasterRunner.class)
 public class WebkitFXBindingsTest {
     {
-        describe("WebView", () -> {
+        describe("WebkitFXBindings", () -> {
             WebView webView = new WebView();
             WebEngine engine = webView.getEngine();
 
-            it("runs", () -> {
-                String script = new String(Files.readAllBytes(Paths.get(WebkitFXBindings.class.getResource("test1.js").toURI())));
-                Object rect = engine.executeScript(script);
-                System.out.println(rect);
-                JSObject o2 = (JSObject) rect;
-                JSObject surface = (JSObject) o2.getMember("surface");
-                System.out.println(surface);
-                System.out.println(((JSObject) rect).call("surface"));
-                System.out.println(surface.call("call", o2));
+            WebkitFXBindings webkitFXBindings = new WebkitFXBindings(engine);
 
-                System.out.println("=====================");
+            Rectangle rect = webkitFXBindings.executeScript(Rectangle.class, WebkitFXBindings.class.getResource("Rectangle.js"));
 
-                WebkitFXBindings webkitFXBindings = new WebkitFXBindings(engine);
+            it("reads JS properties through getters", () -> {
+                expect(rect.width()).toEqual(5.);
+                expect(rect.getHeight()).toEqual(10.);
+            });
 
-                Rectangle javaRect = webkitFXBindings.proxy(Rectangle.class, rect);
+            it("calls JS methods", () -> {
+                expect(rect.surface()).toEqual(50.);
 
-                System.out.println(javaRect.getHeight());
-                System.out.println(javaRect.width());
-                System.out.println(javaRect.surface());
-                javaRect.enlarge(2.);
-                System.out.println(javaRect.surface());
-                System.out.println(javaRect.enlarge());
-                javaRect.setHeight(0.);
-                System.out.println(javaRect.surface());
-                System.out.println(javaRect.getClass().getClassLoader());
+                rect.enlarge(2.);
 
-                Rectangle copy = javaRect.copy();
-                System.out.println(copy.width());
+                expect(rect.surface()).toEqual(200.);
+            });
 
-                System.out.println(javaRect.compare(copy));
+            it("writes JS properties through setters", () -> {
+                rect.width(.5);
+                rect.setHeight(2.);
+                expect(rect.surface()).toEqual(1.);
+            });
+
+            it("stores Proxy classes into its internal classloader", () -> {
+                expect(rect.getClass().getClassLoader()).toEqual(webkitFXBindings.loader);
+            });
+
+            it("encapsulates JSObject into @JSInterface enabled proxy objects", () -> {
+                Rectangle copy = rect.copy();
+                expect(copy.width()).toEqual(.5);
+            });
+
+            it("decapsulates @JSInterface enabled proxy objects to JSObject when used as argments", () -> {
+                expect(rect.copy().equals(rect)).toBeTrue();
             });
         });
-
     }
+
 
     @JSInterface
     public interface Rectangle {
+
+        // property in short syntax
         @Getter
         Double width();
 
         @Setter
         void width(double width);
 
+        // property in Java syntax
         @Getter
         Double getHeight();
 
         @Setter
         void setHeight(double height);
 
+        // method call
         Double surface();
 
         void enlarge(Double factor);
 
+        Rectangle copy();
+
+        // getting a function object
         @Getter
         JSObject enlarge();
 
-        Rectangle copy();
+        // injecting JSInterface as argument
+        boolean equals(Rectangle other);
 
-        boolean compare(Rectangle other);
     }
 
 }
