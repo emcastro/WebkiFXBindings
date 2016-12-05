@@ -13,7 +13,15 @@ Rectangle.prototype.enlarge = function(factor) {
 }
 
 Rectangle.prototype.copy = function() {
-    return new Rectangle(width, height);
+    return new Rectangle(this.width, this.height);
+}
+
+Rectangle.prototype.compare = function(other) {
+    if (other instanceof Rectangle) {
+        return other.width === this.width
+            && other.height === this.height;
+    }
+    return false;
 }
 
 new Rectangle(5,10)

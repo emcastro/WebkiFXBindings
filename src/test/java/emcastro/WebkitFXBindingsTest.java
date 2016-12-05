@@ -25,28 +25,34 @@ public class WebkitFXBindingsTest {
 
             it("runs", () -> {
                 String script = new String(Files.readAllBytes(Paths.get(WebkitFXBindings.class.getResource("test1.js").toURI())));
-                Object o = engine.executeScript(script);
-                System.out.println(o);
-                JSObject o2 = (JSObject) o;
+                Object rect = engine.executeScript(script);
+                System.out.println(rect);
+                JSObject o2 = (JSObject) rect;
                 JSObject surface = (JSObject) o2.getMember("surface");
                 System.out.println(surface);
-                System.out.println(((JSObject) o).call("surface"));
+                System.out.println(((JSObject) rect).call("surface"));
                 System.out.println(surface.call("call", o2));
 
                 System.out.println("=====================");
 
                 WebkitFXBindings webkitFXBindings = new WebkitFXBindings(engine);
 
-                Rectangle proxy = webkitFXBindings.proxy(Rectangle.class, o);
+                Rectangle javaRect = webkitFXBindings.proxy(Rectangle.class, rect);
 
-                System.out.println(proxy.getHeight());
-                System.out.println(proxy.width());
-                System.out.println(proxy.surface());
-                proxy.enlarge(2.);
-                System.out.println(proxy.surface());
-                System.out.println(proxy.enlarge());
-                proxy.setHeight(0.);
-                System.out.println(proxy.surface());
+                System.out.println(javaRect.getHeight());
+                System.out.println(javaRect.width());
+                System.out.println(javaRect.surface());
+                javaRect.enlarge(2.);
+                System.out.println(javaRect.surface());
+                System.out.println(javaRect.enlarge());
+                javaRect.setHeight(0.);
+                System.out.println(javaRect.surface());
+                System.out.println(javaRect.getClass().getClassLoader());
+
+                Rectangle copy = javaRect.copy();
+                System.out.println(copy.width());
+
+                System.out.println(javaRect.compare(copy));
             });
         });
 
@@ -56,6 +62,9 @@ public class WebkitFXBindingsTest {
     public interface Rectangle {
         @Getter
         Double width();
+
+        @Setter
+        void width(double width);
 
         @Getter
         Double getHeight();
@@ -71,6 +80,8 @@ public class WebkitFXBindingsTest {
         JSObject enlarge();
 
         Rectangle copy();
+
+        boolean compare(Rectangle other);
     }
 
 }
