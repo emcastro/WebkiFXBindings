@@ -1,6 +1,7 @@
 package emcastro;
 
 import javafx.scene.web.WebEngine;
+import netscape.javascript.JSException;
 import netscape.javascript.JSObject;
 
 import java.lang.reflect.InvocationHandler;
@@ -24,9 +25,11 @@ public class WebkitFXBindings {
 
     JSObject function;
     Object[] empty = new Object[0];
+    String undefined;
 
     public WebkitFXBindings(WebEngine engine) {
         function = (JSObject) engine.executeScript("Function");
+        undefined = (String) engine.executeScript("undefined");
     }
 
     public <T> T proxy(Class<T> type, Object o) {
@@ -35,7 +38,7 @@ public class WebkitFXBindings {
 
     @SuppressWarnings("unchecked")
     public <T> T proxy(Class<T> type, JSObject o) {
-        return (T) Proxy.newProxyInstance(loader, new Class[]{type}, new MyInvocationHandler(o));
+        return (T) Proxy.newProxyInstance(loader, new Class[]{type}, new JSInvocationHandler(o));
     }
 
     private boolean needConvert(Object arg) {
@@ -44,7 +47,7 @@ public class WebkitFXBindings {
 
     private Object convertArgument(Object arg) {
         if (arg.getClass().getClassLoader() == loader) {
-            MyInvocationHandler handler = (MyInvocationHandler) Proxy.getInvocationHandler(arg);
+            JSInvocationHandler handler = (JSInvocationHandler) Proxy.getInvocationHandler(arg);
             return handler.jsObject;
         } else {
             return arg;
@@ -76,6 +79,11 @@ public class WebkitFXBindings {
     }
 
     private Object convertResult(Class<?> returnType, Object value) {
+        if (value == undefined // identity comparison
+                && returnType != JSObject.class
+                && returnType != void.class)
+            throw new JSException("Undefined value return by Javascript");
+
         if (returnType.isAnnotationPresent(JSInterface.class)) {
             return proxy(returnType, (JSObject) value);
         } else if (returnType.isAssignableFrom(Double.class)) {
@@ -101,10 +109,12 @@ public class WebkitFXBindings {
         }
     }
 
-    private class MyInvocationHandler implements InvocationHandler {
+    public boolean FAST_CALL = false;
+
+    private class JSInvocationHandler implements InvocationHandler {
         private final JSObject jsObject;
 
-        public MyInvocationHandler(JSObject jsObject) {
+        public JSInvocationHandler(JSObject jsObject) {
             this.jsObject = jsObject;
         }
 
@@ -126,8 +136,7 @@ public class WebkitFXBindings {
                     name = methodName;
                 }
 
-                Object o1 = WebkitFXBindings.this.convertResult(returnType, jsObject.getMember(name));
-                return o1;
+                return convertResult(returnType, jsObject.getMember(name));
             } else if (method.isAnnotationPresent(Setter.class)) {
                 checkArity(args, 1);
 
@@ -142,7 +151,27 @@ public class WebkitFXBindings {
                 return null;
             } else {
                 // Method call
-                return convertResult(returnType, jsObject.call(methodName, convertArguments(args)));
+                Object[] convertArguments = convertArguments(args);
+                Object jsResult;
+                if (FAST_CALL) {
+                    jsResult = jsObject.call(methodName, convertArguments);
+                } else {
+                    Object jsMethod = jsObject.getMember(methodName);
+                    if (jsMethod == undefined) {// identity comparison
+                        throw new JSException("Method " + methodName + " not found");
+                    } else {
+                        Object[] extendedArgs = new Object[convertArguments.length + 1];
+
+                        extendedArgs[0] = jsObject;
+                        int i = 1;
+                        for (Object arg : convertArguments) {
+                            extendedArgs[i++] = arg;
+                        }
+
+                        jsResult = ((JSObject) jsMethod).call("call", extendedArgs);
+                    }
+                }
+                return convertResult(returnType, jsResult);
             }
         }
     }
