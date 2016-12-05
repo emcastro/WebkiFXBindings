@@ -4,8 +4,8 @@ import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
 
 /**
- * Indicates that an interface encapsulates a JSObject
+ * Created by ecastro on 05/12/16.
  */
 @Retention(RetentionPolicy.RUNTIME)
-public @interface JSInterface {
+public @interface Getter {
 }

@@ -12,4 +12,8 @@ Rectangle.prototype.enlarge = function(factor) {
     this.height *= factor;
 }
 
+Rectangle.prototype.copy = function() {
+    return new Rectangle(width, height);
+}
+
 new Rectangle(5,10)

@@ -8,7 +8,6 @@ import org.junit.runner.RunWith;
 
 import java.nio.file.Files;
 import java.nio.file.Paths;
-import java.util.function.Supplier;
 
 import static emcastro.util.FXTest.describe;
 import static emcastro.util.FXTest.it;
@@ -38,12 +37,15 @@ public class WebkitFXBindingsTest {
 
                 WebkitFXBindings webkitFXBindings = new WebkitFXBindings(engine);
 
-                Rectangle_V1 proxy = webkitFXBindings.proxy(Rectangle_V1.class, o);
+                Rectangle proxy = webkitFXBindings.proxy(Rectangle.class, o);
 
-                System.out.println(proxy.height());
+                System.out.println(proxy.getHeight());
                 System.out.println(proxy.width());
                 System.out.println(proxy.surface());
                 proxy.enlarge(2.);
+                System.out.println(proxy.surface());
+                System.out.println(proxy.enlarge());
+                proxy.setHeight(0.);
                 System.out.println(proxy.surface());
             });
         });
@@ -51,17 +53,24 @@ public class WebkitFXBindingsTest {
     }
 
     @JSInterface
-    public interface Rectangle_V1 {
+    public interface Rectangle {
+        @Getter
         Double width();
-        Double height();
-        Double surface();
-        void enlarge(Double factor);
-    }
 
-    public interface Rectangle_V2 {
-        Double width();
-        Double height();
-        Supplier<Double> surface();
+        @Getter
+        Double getHeight();
+
+        @Setter
+        void setHeight(double height);
+
+        Double surface();
+
+        void enlarge(Double factor);
+
+        @Getter
+        JSObject enlarge();
+
+        Rectangle copy();
     }
 
 }

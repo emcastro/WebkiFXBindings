@@ -33,35 +33,51 @@ public class WebkitFXBindings {
 
         return (T) Proxy.newProxyInstance(loader, new Class[]{type}, (proxy, method, args) -> {
 
-            Class<?> returnType = method.getReturnType();
+            if (method.isAnnotationPresent(Getter.class)) {
+                checkArity(args, 0);
 
-            Object value = o.getMember(method.getName());
+                String name;
+                if (method.getName().startsWith("get")) {
+                    name = Character.toLowerCase(method.getName().charAt(3)) + method.getName().substring(4);
+                } else if (method.getName().startsWith("is")) {
+                    name = Character.toLowerCase(method.getName().charAt(2)) + method.getName().substring(3);
+                } else {
+                    name = method.getName();
+                }
 
-            if (returnType.isAnnotationPresent(JSInterface.class)) {
+                Object o1 = convertResult(method.getReturnType(), o.getMember(name));
+                return o1;
+            } else if (method.isAnnotationPresent(Setter.class)) {
+                checkArity(args, 1);
+
+                String name;
+                if (method.getName().startsWith("set")) {
+                    name = Character.toLowerCase(method.getName().charAt(3)) + method.getName().substring(4);
+                } else {
+                    name = method.getName();
+                }
+                o.setMember(name, convertArguments(args)[0]);
+
                 return null;
             } else {
-                if (value instanceof JSObject) {
-                    if (returnType.isAssignableFrom(JSObject.class)) {
-                        return value;
-                    }
-                    // We suppose that it is a function
-                    if (args == null) {
-                        args = empty;
-                    }
-
-                    return convertResult(returnType, o.call(method.getName(), args));
-                } else {
-                    checkArity(args, 0);
-                    return convertResult(returnType, value);
+                if (args == null) {
+                    args = empty;
                 }
+                // Method call
+                return convertResult(method.getReturnType(), o.call(method.getName(), convertArguments(args)));
             }
-
         });
 
     }
 
+    private Object[] convertArguments(Object[] args) {
+        return args; // décapsule le JSObject
+    }
+
     private Object convertResult(Class<?> returnType, Object value) {
-        if (returnType.isAssignableFrom(Double.class)) {
+        if (returnType.isAnnotationPresent(JSInterface.class)) {
+            return null;
+        } else if (returnType.isAssignableFrom(Double.class)) {
             // convert integer to Double
             if (value instanceof Integer) {
                 return ((Integer) value).doubleValue();
