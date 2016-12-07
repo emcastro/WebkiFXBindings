@@ -15,7 +15,12 @@ public class FXTest {
         StaticRunnerSupport.describe(text, () -> {
             PlatformImpl.startup(() -> {
             });
-            invoke(block);
+            try {
+                invoke(block);
+            } catch (Exception e) {
+                e.printStackTrace();
+                throw e;
+            }
         });
     }
 

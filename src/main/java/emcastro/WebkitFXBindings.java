@@ -7,9 +7,7 @@ import netscape.javascript.JSObject;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
-import java.lang.reflect.InvocationHandler;
-import java.lang.reflect.Method;
-import java.lang.reflect.Proxy;
+import java.lang.reflect.*;
 import java.net.URL;
 
 /**
@@ -57,16 +55,32 @@ public class WebkitFXBindings {
     }
 
     public <T> T executeScript(Class<T> type, String script) {
-        return proxy(type, engine.executeScript(script));
+        return proxy(type, (JSObject) engine.executeScript(script));
     }
 
-    public <T> T proxy(Class<T> type, Object o) {
-        return proxy(type, (JSObject) o);
+    public <T> T proxy(Class<T> type, JSObject o) {
+        return proxy((Type) type, o);
     }
 
     @SuppressWarnings("unchecked")
-    public <T> T proxy(Class<T> type, JSObject o) {
-        return (T) Proxy.newProxyInstance(loader, new Class[]{type}, new JSInvocationHandler(o));
+    private <T> T proxy(Type type, JSObject o) {
+        Class<?> clazz = getClass(type);
+
+        if (clazz.isAnnotationPresent(JSInterface.class)) {
+            return (T) Proxy.newProxyInstance(loader, new Class[]{clazz}, new JSInvocationHandler(o, type));
+        } else {
+            throw new IllegalArgumentException("The type argument must be an interface with the @JSInterface annotation: " + type);
+        }
+    }
+
+    private static Class<?> getClass(Type type) {
+        Class<?> clazz;
+        if (type instanceof ParameterizedType) {
+            clazz = (Class) ((ParameterizedType) type).getRawType();
+        } else {
+            clazz = (Class) type;
+        }
+        return clazz;
     }
 
     private boolean needConvert(Object arg) {
@@ -106,15 +120,19 @@ public class WebkitFXBindings {
         return convertedArgs;
     }
 
-    private Object convertResult(Class<?> returnType, Object value) {
+
+    private Object convertResult(Type returnType, Object value) {
+        Class<?> returnClass = getClass(returnType);
+
         if (value == undefined // identity comparison
-                && returnType != JSObject.class
-                && returnType != void.class)
+                && returnClass != JSObject.class
+                && returnClass != void.class
+                && returnClass != Void.class)
             throw new JSException("Undefined value return by Javascript");
 
-        if (returnType.isAnnotationPresent(JSInterface.class)) {
+        if (returnClass.isAnnotationPresent(JSInterface.class)) {
             return proxy(returnType, (JSObject) value);
-        } else if (returnType.isAssignableFrom(Double.class)) {
+        } else if (returnClass.isAssignableFrom(Double.class)) {
             // convert integer to Double
             if (value instanceof Integer) {
                 return ((Integer) value).doubleValue();
@@ -141,16 +159,31 @@ public class WebkitFXBindings {
 
     private class JSInvocationHandler implements InvocationHandler {
         private final JSObject jsObject;
+        private final Type type;
 
-        public JSInvocationHandler(JSObject jsObject) {
+        public JSInvocationHandler(JSObject jsObject, Type type) {
             this.jsObject = jsObject;
+            this.type = type;
         }
 
         @Override
         public Object invoke(Object proxy, Method method, Object[] args) throws Throwable {
 
             String methodName = method.getName();
-            Class<?> returnType = method.getReturnType();
+            Type returnType = method.getGenericReturnType();
+
+            if (returnType instanceof TypeVariable) {
+                // Resolve the type variable
+                TypeVariable[] typeParameters = ((Class) ((ParameterizedType) type).getRawType()).getTypeParameters();
+                int i;
+                for (i = 0; i < typeParameters.length; i++) {
+                    if (typeParameters[i].equals(returnType)) break;
+                }
+                if (i == typeParameters.length) throw new AssertionError("Type parameter not found");
+
+                returnType = ((ParameterizedType) type).getActualTypeArguments()[i];
+            }
+
 
             if (method.isAnnotationPresent(Getter.class)) {
                 checkArity(args, 0);

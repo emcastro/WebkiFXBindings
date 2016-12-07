@@ -16,6 +16,10 @@ Rectangle.prototype.copy = function() {
     return new Rectangle(this.width, this.height);
 }
 
+Rectangle.prototype.toArray = function() {
+    return [this.width, this.height];
+}
+
 Rectangle.prototype.equals = function(other) {
     if (other instanceof Rectangle) {
         return other.width === this.width

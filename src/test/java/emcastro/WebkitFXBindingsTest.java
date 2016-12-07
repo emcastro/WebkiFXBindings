@@ -56,6 +56,14 @@ public class WebkitFXBindingsTest {
             it("decapsulates @JSInterface enabled proxy objects to JSObject when used as argments", () -> {
                 expect(rect.copy().equals(rect)).toBeTrue();
             });
+
+            it("invokes function when retrieved from property", () -> {
+                expect(rect.surface()).toEqual(1.);
+                Rectangle rect2 = rect.copy();
+                JSFunction2<Rectangle, Double, Void> enlarge = rect2.enlarge();
+                enlarge.call(rect2, 10.);
+                expect(rect2.surface()).toEqual(100.);
+            });
         });
     }
 
@@ -86,10 +94,12 @@ public class WebkitFXBindingsTest {
 
         // getting a function object
         @Getter
-        JSObject enlarge();
+        JSFunction2<Rectangle, Double, Void> enlarge();
 
         // injecting JSInterface as argument
         boolean equals(Rectangle other);
+
+        JSObject toArray();
 
     }
 
