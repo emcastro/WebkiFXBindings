@@ -30,39 +30,54 @@ public class WebkitFXBindingsTest {
                 expect(rect.getHeight()).toEqual(10.);
             });
 
+            it("encapsulates JSObject into @JSInterface enabled proxy objects", () -> {
+                Rectangle copy = rect.copy();
+                expect(copy.width()).toEqual(5.);
+            });
+
+
             it("calls JS methods", () -> {
-                expect(rect.surface()).toEqual(50.);
+                Rectangle copy = rect.copy();
+                expect(copy.surface()).toEqual(50.);
 
-                rect.enlarge(2.);
+                copy.enlarge(2.);
 
-                expect(rect.surface()).toEqual(200.);
+                expect(copy.surface()).toEqual(200.);
             });
 
             it("writes JS properties through setters", () -> {
-                rect.width(.5);
-                rect.setHeight(2.);
-                expect(rect.surface()).toEqual(1.);
+                Rectangle copy = rect.copy();
+                copy.width(.5);
+                copy.setHeight(2.);
+                expect(copy.surface()).toEqual(1.);
             });
 
             it("stores Proxy classes into its internal classloader", () -> {
                 expect(rect.getClass().getClassLoader()).toEqual(webkitFXBindings.loader);
             });
 
-            it("encapsulates JSObject into @JSInterface enabled proxy objects", () -> {
-                Rectangle copy = rect.copy();
-                expect(copy.width()).toEqual(.5);
-            });
 
             it("decapsulates @JSInterface enabled proxy objects to JSObject when used as argments", () -> {
-                expect(rect.copy().equals(rect)).toBeTrue();
+                expect(rect.copy().equals(rect)).toBeTrue(); // Note: equals is a Javascript implementation
             });
 
             it("invokes function when retrieved from property", () -> {
-                expect(rect.surface()).toEqual(1.);
+                expect(rect.surface()).toEqual(50.);
                 Rectangle rect2 = rect.copy();
                 JSFunction2<Rectangle, Double, Void> enlarge = rect2.enlarge();
-                enlarge.call(rect2, 10.);
-                expect(rect2.surface()).toEqual(100.);
+                enlarge.call(rect2, .1);
+                expect(rect2.surface()).toEqual(.5);
+            });
+
+            it("handle JS arrays", () -> {
+                JSArray<Double> array = rect.toArray();
+                expect(array.get(0)).toEqual(5.);
+                expect(array.get(1)).toEqual(10.);
+
+                expect(array.length()).toEqual(2);
+
+                array.set(1,20.);
+                expect(array.get(1)).toEqual(20.);
             });
         });
     }
@@ -99,7 +114,7 @@ public class WebkitFXBindingsTest {
         // injecting JSInterface as argument
         boolean equals(Rectangle other);
 
-        JSObject toArray();
+        JSArray<Double> toArray();
 
     }
 
