@@ -43,6 +43,7 @@ public class WebkitFXBindingsTest {
                 copy.enlarge(2.);
 
                 expect(copy.surface()).toEqual(200.);
+                expect(copy.surfaceAsInt()).toEqual(200);
             });
 
             it("writes JS properties through setters", () -> {
@@ -76,8 +77,14 @@ public class WebkitFXBindingsTest {
 
                 expect(array.length()).toEqual(2);
 
-                array.set(1,20.);
+                array.set(1, 20.);
                 expect(array.get(1)).toEqual(20.);
+            });
+
+            it("encapsulates Java callback parameters", () -> {
+
+                rect.transform((rect2, value) -> rect2.surface() * value);
+
             });
         });
     }
@@ -103,6 +110,10 @@ public class WebkitFXBindingsTest {
         // method call
         Double surface();
 
+        @JSName("surface")
+        int surfaceAsInt();
+
+
         void enlarge(Double factor);
 
         Rectangle copy();
@@ -114,8 +125,14 @@ public class WebkitFXBindingsTest {
         // injecting JSInterface as argument
         boolean equals(Rectangle other);
 
+        // array
         JSArray<Double> toArray();
 
+        // callback
+        Rectangle transform(@This JSFunction2<Rectangle, Double, Double> transformer);
+
+        @JSName("arrayTransform")
+        Rectangle transform(JSFunction1<JSArray<Double>, JSArray<Double>> transformer);
     }
 
 }

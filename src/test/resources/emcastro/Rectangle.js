@@ -28,4 +28,14 @@ Rectangle.prototype.equals = function(other) {
     return false;
 }
 
+Rectangle.prototype.transform = function(transformer) {
+    return new Rectangle(transformer(this.width), transformer(this.height));
+}
+
+Rectangle.prototype.arrayTransform = function(arrayTransformer) {
+    var transformedArray = arrayTransformer(this.toArray)
+    return new Rectangle(transformedArray[0], transformedArray[1]);
+}
+
+
 new Rectangle(5,10)

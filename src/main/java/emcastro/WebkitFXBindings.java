@@ -7,6 +7,7 @@ import netscape.javascript.JSObject;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
+import java.lang.annotation.Annotation;
 import java.lang.reflect.*;
 import java.net.URL;
 
@@ -25,13 +26,12 @@ public class WebkitFXBindings {
         }
     };
 
-    private final JSObject function;
     private final Object[] empty = new Object[0];
+    private final ParameterType[] emptyParamTypes = new ParameterType[0];
     private final String undefined;
     private final WebEngine engine;
 
     public WebkitFXBindings(WebEngine engine) {
-        function = (JSObject) engine.executeScript("Function");
         undefined = (String) engine.executeScript("undefined");
         this.engine = engine;
     }
@@ -83,37 +83,40 @@ public class WebkitFXBindings {
         return clazz;
     }
 
-    private Object convertFromJava(Object arg) {
-        if (arg.getClass().getClassLoader() == loader) {
-            JSInvocationHandler handler = (JSInvocationHandler) Proxy.getInvocationHandler(arg);
+    private Object convertFromJava(ParameterType type, Object value) {
+        if (value.getClass().getClassLoader() == loader) {
+            JSInvocationHandler handler = (JSInvocationHandler) Proxy.getInvocationHandler(value);
             return handler.jsObject;
+        } else if (value instanceof JSFunction) {
+
+            boolean hasThisAnnotation = false;
+            for (Annotation annotation : type.annotations) {
+                if (annotation instanceof This) {
+                    hasThisAnnotation = true;
+                }
+            }
+
+            throw new UnsupportedOperationException();
         } else {
-            return arg;
+            return value;
         }
     }
 
-    private Object[] convertFromJava(Object[] args) {
-        if (args == null) {
-            args = empty;
-        }
+    private Object[] convertFromJava(ParameterType[] types, Object[] values) {
+        Object[] convertedArgs = new Object[values.length];
 
-        boolean needConvert = false;
-        for (Object arg : args) {
-            if (arg.getClass().getClassLoader() == loader) {
-                needConvert = true;
-                break;
+        boolean valueChanged = false;
+        for (int i = 0; i < values.length; i++) {
+            convertedArgs[i] = convertFromJava(types[i], values[i]);
+            if (convertedArgs[i] != values[i]) {
+                valueChanged = true;
             }
         }
 
-        if (!needConvert) return args;
-
-        Object[] convertedArgs = new Object[args.length];
-
-        for (int i = 0; i < args.length; i++) {
-            convertedArgs[i] = convertFromJava(args[i]);
-        }
-
-        return convertedArgs;
+        if (valueChanged)
+            return convertedArgs;
+        else
+            return values; // Don't let escape unnecessary new Object[]
     }
 
 
@@ -153,11 +156,51 @@ public class WebkitFXBindings {
 
     public boolean FAST_CALL = false;
 
+    static class ParameterType {
+        final Annotation[] annotations;
+        final Type type;
+
+        ParameterType(Annotation[] annotations, Type type) {
+            this.annotations = annotations;
+            this.type = type;
+        }
+    }
+
+    static String jsName(Method method, String... javaPrefix) {
+        if (method.isAnnotationPresent(JSName.class)) {
+            return method.getAnnotation(JSName.class).value();
+        }
+
+        String methodName = method.getName();
+        for (String p : javaPrefix) {
+            if (methodName.length() > p.length() && methodName.startsWith(p)) {
+                return Character.toLowerCase(methodName.charAt(p.length())) + methodName.substring(p.length() + 1);
+            }
+        }
+
+        return methodName;
+    }
+
+    static ParameterType[] parameterTypes(Method method) {
+        Type[] parameterTypes = method.getGenericParameterTypes();
+        Annotation[][] parameterAnnotations = method.getParameterAnnotations();
+
+        if (parameterTypes == null) return null;
+        ParameterType[] types = new ParameterType[parameterTypes.length];
+
+        for (int i = 0; i < parameterTypes.length; i++) {
+            types[i] = new ParameterType(parameterAnnotations[i], parameterTypes[i]);
+        }
+
+        return types;
+    }
+
+
     private class JSInvocationHandler implements InvocationHandler {
         private final JSObject jsObject;
         private final Type type;
 
-        public JSInvocationHandler(JSObject jsObject, Type type) {
+        JSInvocationHandler(JSObject jsObject, Type type) {
             this.jsObject = jsObject;
             this.type = type;
         }
@@ -165,9 +208,69 @@ public class WebkitFXBindings {
         @Override
         public Object invoke(Object proxy, Method method, Object[] args) throws Throwable {
 
-            String methodName = method.getName();
-            Type returnType = method.getGenericReturnType();
+            ParameterType[] paramTypes = parameterTypes(method);
+            if (args == null) {
+                args = empty;
+            }
+            if (paramTypes == null) {
+                paramTypes = emptyParamTypes;
+            }
 
+            Type returnType = resolveType(method.getGenericReturnType());
+
+            if (method.isAnnotationPresent(Getter.class)) {
+                checkArity(args, 0);
+
+                String name = jsName(method, "is", "get");
+                return convertToJava(returnType, jsObject.getMember(name));
+
+            } else if (method.isAnnotationPresent(Setter.class)) {
+                checkArity(args, 1);
+
+                String name = jsName(method, "set");
+                jsObject.setMember(name, convertFromJava(paramTypes[0], args[0]));
+                return null;
+
+            } else if (method.isAnnotationPresent(ArrayGetter.class)) {
+                checkArity(args, 1);
+
+                return convertToJava(returnType, jsObject.getSlot((int) args[0]));
+
+            } else if (method.isAnnotationPresent(ArraySetter.class)) {
+                checkArity(args, 2);
+
+                jsObject.setSlot((int) args[0], convertFromJava(paramTypes[1], args[1]));
+
+                return null;
+
+            } else {
+                // Method call
+                String methodName = jsName(method);
+                Object[] convertArguments = convertFromJava(paramTypes, args);
+                Object jsResult;
+                if (FAST_CALL) {
+                    jsResult = jsObject.call(methodName, convertArguments);
+                } else {
+                    Object jsMethod = jsObject.getMember(methodName);
+                    if (jsMethod == undefined) {// identity comparison
+                        throw new JSException("Method " + methodName + " not found");
+                    } else {
+                        Object[] extendedArgs = new Object[convertArguments.length + 1];
+
+                        extendedArgs[0] = jsObject;
+                        int i = 1;
+                        for (Object arg : convertArguments) {
+                            extendedArgs[i++] = arg;
+                        }
+
+                        jsResult = ((JSObject) jsMethod).call("call", extendedArgs);
+                    }
+                }
+                return convertToJava(returnType, jsResult);
+            }
+        }
+
+        private Type resolveType(Type returnType) {
             if (returnType instanceof TypeVariable) {
                 // Resolve the type variable
                 TypeVariable[] typeParameters = ((Class) ((ParameterizedType) type).getRawType()).getTypeParameters();
@@ -182,90 +285,11 @@ public class WebkitFXBindings {
 
             if (returnType instanceof Class && ((Class) returnType).getTypeParameters().length != 0) {
                 throw new IllegalStateException("Parametrized class " + ((Class) returnType).getName() +
-                        " used without its type parameters in method " + method);
+                        " used without its type parameters");
             }
-
-
-            if (method.isAnnotationPresent(Getter.class)) {
-                return invokeGetter(args, methodName, returnType);
-            } else if (method.isAnnotationPresent(Setter.class)) {
-                return invokeSetter(args, methodName);
-            } else if (method.isAnnotationPresent(ArrayGetter.class)) {
-                return invokeArrayGetter(args, returnType);
-            } else if (method.isAnnotationPresent(ArraySetter.class)) {
-                return invokeArraySetter(args);
-            } else {
-                return invokeMethod(args, methodName, returnType);
-            }
+            return returnType;
         }
 
-        private Object invokeMethod(Object[] args, String methodName, Type returnType) {
-            // Method call
-            Object[] convertArguments = convertFromJava(args);
-            Object jsResult;
-            if (FAST_CALL) {
-                jsResult = jsObject.call(methodName, convertArguments);
-            } else {
-                Object jsMethod = jsObject.getMember(methodName);
-                if (jsMethod == undefined) {// identity comparison
-                    throw new JSException("Method " + methodName + " not found");
-                } else {
-                    Object[] extendedArgs = new Object[convertArguments.length + 1];
-
-                    extendedArgs[0] = jsObject;
-                    int i = 1;
-                    for (Object arg : convertArguments) {
-                        extendedArgs[i++] = arg;
-                    }
-
-                    jsResult = ((JSObject) jsMethod).call("call", extendedArgs);
-                }
-            }
-            return convertToJava(returnType, jsResult);
-        }
-
-        private Object invokeSetter(Object[] args, String methodName) {
-            checkArity(args, 1);
-
-            String name;
-            if (methodName.startsWith("set")) {
-                name = Character.toLowerCase(methodName.charAt(3)) + methodName.substring(4);
-            } else {
-                name = methodName;
-            }
-            jsObject.setMember(name, convertFromJava(args[0]));
-
-            return null;
-        }
-
-        private Object invokeGetter(Object[] args, String methodName, Type returnType) {
-            checkArity(args, 0);
-
-            String name;
-            if (methodName.startsWith("get")) {
-                name = Character.toLowerCase(methodName.charAt(3)) + methodName.substring(4);
-            } else if (methodName.startsWith("is")) {
-                name = Character.toLowerCase(methodName.charAt(2)) + methodName.substring(3);
-            } else {
-                name = methodName;
-            }
-
-            return convertToJava(returnType, jsObject.getMember(name));
-        }
-
-        private Object invokeArraySetter(Object[] args) {
-            checkArity(args, 2);
-
-            jsObject.setSlot((int) args[0], convertFromJava(args[1]));
-
-            return null;
-        }
-
-        private Object invokeArrayGetter(Object[] args, Type returnType) {
-            checkArity(args, 1);
-
-            return convertToJava(returnType, jsObject.getSlot((int) args[0]));
-        }
     }
 
 }
