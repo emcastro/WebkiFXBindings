@@ -29,10 +29,20 @@ public class WebkitFXBindings {
     private final Object[] empty = new Object[0];
     private final ParameterType[] emptyParamTypes = new ParameterType[0];
     private final String undefined;
+    final JSObject java2js;
     private final WebEngine engine;
 
     public WebkitFXBindings(WebEngine engine) {
         undefined = (String) engine.executeScript("undefined");
+        java2js = (JSObject) engine.executeScript("" +
+                "function WebkitFXBinding_java2js(javaFunction) {" +
+                "   function javaCall() {" +
+                "       return javaFunction.invoke(this, arguments);" +
+                "   }" +
+                "   return javaCall;" +
+                "}" +
+                "" +
+                "WebkitFXBinding_java2js");
         this.engine = engine;
     }
 
@@ -88,6 +98,7 @@ public class WebkitFXBindings {
             JSInvocationHandler handler = (JSInvocationHandler) Proxy.getInvocationHandler(value);
             return handler.jsObject;
         } else if (value instanceof JSFunction) {
+            JSFunction jsFunction = (JSFunction) value;
 
             boolean hasThisAnnotation = false;
             for (Annotation annotation : type.annotations) {
@@ -96,9 +107,42 @@ public class WebkitFXBindings {
                 }
             }
 
-            throw new UnsupportedOperationException();
+            Object publisher = hasThisAnnotation ? new FunctionPublisherWithThis(jsFunction) : new FunctionPublisher(jsFunction);
+
+            Object transformed = java2js.call("call", publisher);
+
+            return transformed;
         } else {
             return value;
+        }
+    }
+
+    public class FunctionPublisher {
+        public FunctionPublisher(JSFunction function) {
+            this.function = function;
+        }
+
+        final JSFunction function;
+
+        public Object invoke(Object self, JSObject args) {
+
+
+            return null;
+        }
+    }
+
+    public class FunctionPublisherWithThis {
+        public FunctionPublisherWithThis(JSFunction function) {
+            this.function = function;
+        }
+
+        final JSFunction function;
+
+        public Object invoke(Object self, JSObject args) {
+
+
+//            return convertFromJava();
+            return null;
         }
     }
 

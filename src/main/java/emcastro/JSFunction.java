@@ -4,5 +4,14 @@ package emcastro;
  * Created by ecastro on 12/12/16.
  */
 public interface JSFunction {
-    // TODO on pourra mettre un invoke qui appellera les calls
+
+    Object invoke(Object[] arguments);
+
+    default void checkArity(Object[] arguments, int arity) {
+        if (arguments.length == arity) {
+            throw new IllegalArgumentException("Actual argument count (" + arguments.length + ") " +
+                    "doesn't match function arity (" + arity + ")");
+        }
+    }
+
 }

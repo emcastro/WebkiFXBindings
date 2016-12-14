@@ -81,14 +81,42 @@ public class WebkitFXBindingsTest {
                 expect(array.get(1)).toEqual(20.);
             });
 
+            it("can return raw JSObject", () -> {
+                JSObject rawCopy = rect.rawCopy();
+                expect(rawCopy.getMember("width")).toEqual(5);
+                expect(rawCopy.getMember("height")).toEqual(10);
+            });
+
             it("encapsulates Java callback parameters", () -> {
 
                 rect.transform((rect2, value) -> rect2.surface() * value);
 
             });
         });
+
+        describe("Java to JS function transformation", () -> {
+            it("behaves correctly", () -> {
+                WebView webView = new WebView();
+                WebEngine engine = webView.getEngine();
+
+                WebkitFXBindings webkitFXBindings = new WebkitFXBindings(engine);
+
+                JSObject js = (JSObject) webkitFXBindings.java2js.call("call", null, new FunctionPublisher());
+                expect(js.toString()).toStartWith("function javaCall()");
+                expect(js.call("call", js, 42, 24)).toEqual(66);
+            });
+        });
     }
 
+    public static class FunctionPublisher {
+
+        public Object invoke(Object self, JSObject args) {
+            expect(self.toString()).toStartWith("function javaCall()");
+            expect(args.getMember("length")).toEqual(2);
+            return (int) args.getSlot(0) + (int) args.getSlot(1);
+        }
+
+    }
 
     @JSInterface
     public interface Rectangle {
@@ -117,6 +145,10 @@ public class WebkitFXBindingsTest {
         void enlarge(Double factor);
 
         Rectangle copy();
+
+        // getting the raw JSObject
+        @JSName("copy")
+        JSObject rawCopy();
 
         // getting a function object
         @Getter
