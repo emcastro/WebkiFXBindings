@@ -17,4 +17,29 @@ public interface JSArray<A> {
 
     //TODO implement default stream and iterator
 
+
+    class Instance<B> implements JSArray<B> {
+
+        public Instance(Object... array) {
+            this.array = array;
+        }
+
+        private Object[] array;
+
+        @Override
+        public B get(int index) {
+            return (B) array[index];
+        }
+
+        @Override
+        public void set(int index, B value) {
+            array[index] = value;
+        }
+
+        @Override
+        public int length() {
+            return array.length;
+        }
+    }
+
 }

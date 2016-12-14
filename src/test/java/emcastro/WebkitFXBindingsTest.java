@@ -89,8 +89,26 @@ public class WebkitFXBindingsTest {
 
             it("encapsulates Java callback parameters", () -> {
 
-                rect.transform((rect2, value) -> rect2.surface() * value);
+                rect.transform(value -> {
+                    System.out.println();
+                    return rect.surface() * value;
+                });
 
+                rect.arrayTransform(value -> {
+                    System.out.println();
+                    return new JSArray.Instance<>(value.get(1), value.get(0));
+                });
+
+            });
+
+            it("injects methods into objects", () -> {
+
+                Rectangle copy = rect.copy();
+                expect(copy.prettyPrint()).toEqual("<5,10>");
+                copy.setFormatter(self -> "[" + self.width() + ":" + self.getHeight() + "]");
+                expect(copy.prettyPrint()).toEqual("[5:10]");
+
+                // TODO implements calling default to inject real method
             });
         });
 
@@ -101,19 +119,20 @@ public class WebkitFXBindingsTest {
 
                 WebkitFXBindings webkitFXBindings = new WebkitFXBindings(engine);
 
+                JSObject obj = (JSObject) webkitFXBindings.engine.executeScript("r={value: 22}; r");
+
                 JSObject js = (JSObject) webkitFXBindings.java2js.call("call", null, new FunctionPublisher());
                 expect(js.toString()).toStartWith("function javaCall()");
-                expect(js.call("call", js, 42, 24)).toEqual(66);
+                expect(js.call("call", obj, 42, 24)).toEqual(88); // 42+24+22
             });
         });
     }
 
     public static class FunctionPublisher {
 
-        public Object invoke(Object self, JSObject args) {
-            expect(self.toString()).toStartWith("function javaCall()");
+        public Object invoke(JSObject self, JSObject args) {
             expect(args.getMember("length")).toEqual(2);
-            return (int) args.getSlot(0) + (int) args.getSlot(1);
+            return (int) args.getSlot(0) + (int) args.getSlot(1) + (int) self.getMember("value");
         }
 
     }
@@ -161,10 +180,14 @@ public class WebkitFXBindingsTest {
         JSArray<Double> toArray();
 
         // callback
-        Rectangle transform(@This JSFunction2<Rectangle, Double, Double> transformer);
+        Rectangle transform(JSFunction1<Double, Double> transformer);
 
-        @JSName("arrayTransform")
-        Rectangle transform(JSFunction1<JSArray<Double>, JSArray<Double>> transformer);
+        Rectangle arrayTransform(JSFunction1<JSArray<Double>, JSArray<Double>> transformer);
+
+        @Setter
+        void setFormatter(@This JSFunction1<Rectangle, String> function);
+
+        String prettyPrint();
     }
 
 }

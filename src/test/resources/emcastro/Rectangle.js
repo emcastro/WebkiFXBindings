@@ -37,5 +37,13 @@ Rectangle.prototype.arrayTransform = function(arrayTransformer) {
     return new Rectangle(transformedArray[0], transformedArray[1]);
 }
 
+Rectangle.prototype.prettyPrint = function() {
+    if (this.formatter === undefined) {
+        return "<"+this.width+","+this.height+">";
+    } else {
+        return this.formatter()
+    }
+}
+
 
 new Rectangle(5,10)

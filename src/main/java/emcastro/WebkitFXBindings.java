@@ -30,7 +30,7 @@ public class WebkitFXBindings {
     private final ParameterType[] emptyParamTypes = new ParameterType[0];
     private final String undefined;
     final JSObject java2js;
-    private final WebEngine engine;
+    final WebEngine engine;
 
     public WebkitFXBindings(WebEngine engine) {
         undefined = (String) engine.executeScript("undefined");
@@ -107,9 +107,9 @@ public class WebkitFXBindings {
                 }
             }
 
-            Object publisher = hasThisAnnotation ? new FunctionPublisherWithThis(jsFunction) : new FunctionPublisher(jsFunction);
+            Object publisher = new FunctionPublisher(hasThisAnnotation, type.type, jsFunction);
 
-            Object transformed = java2js.call("call", publisher);
+            Object transformed = java2js.call("call", null, publisher);
 
             return transformed;
         } else {
@@ -118,31 +118,27 @@ public class WebkitFXBindings {
     }
 
     public class FunctionPublisher {
-        public FunctionPublisher(JSFunction function) {
+        public FunctionPublisher(boolean hasThis, Type type, JSFunction function) {
+            this.hasThis = hasThis;
+            this.type = type;
             this.function = function;
         }
 
+        final boolean hasThis;
+        final Type type;
         final JSFunction function;
 
         public Object invoke(Object self, JSObject args) {
-
-
-            return null;
-        }
-    }
-
-    public class FunctionPublisherWithThis {
-        public FunctionPublisherWithThis(JSFunction function) {
-            this.function = function;
-        }
-
-        final JSFunction function;
-
-        public Object invoke(Object self, JSObject args) {
-
-
-//            return convertFromJava();
-            return null;
+            int length = (int) args.getMember("length");
+            if (hasThis) length += 1;
+            Object[] converted = new Object[length];
+            if (hasThis) {
+                converted[0] = convertToJava(null, self); // TODO gérer les types
+            }
+            for (int i = hasThis ? 1 : 0; i < length; i++) {
+                converted[i] = convertToJava(null, args.getSlot(i));
+            }
+            return convertFromJava(null, function.invoke(converted));
         }
     }
 
