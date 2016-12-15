@@ -88,16 +88,15 @@ public class WebkitFXBindingsTest {
             });
 
             it("encapsulates Java callback parameters", () -> {
+                Rectangle copy = rect.copy();
+                Rectangle transform = copy.transform(value -> copy.surface() * value);
+                expect(transform.width()).toEqual(250.);
+                expect(transform.getHeight()).toEqual(500.);
 
-                rect.transform(value -> {
-                    System.out.println();
-                    return rect.surface() * value;
-                });
-
-                rect.arrayTransform(value -> {
-                    System.out.println();
-                    return new JSArray.Instance<>(value.get(1), value.get(0));
-                });
+//                Rectangle rectangle = copy.arrayTransform(value -> new JSArray.Instance<>(value.get(1), value.get(0)));
+//                System.out.println(rectangle);
+//                expect(rectangle.width()).toEqual(10.);
+//                expect(rectangle.getHeight()).toEqual(5.);
 
             });
 
@@ -106,7 +105,7 @@ public class WebkitFXBindingsTest {
                 Rectangle copy = rect.copy();
                 expect(copy.prettyPrint()).toEqual("<5,10>");
                 copy.setFormatter(self -> "[" + self.width() + ":" + self.getHeight() + "]");
-                expect(copy.prettyPrint()).toEqual("[5:10]");
+                expect(copy.prettyPrint()).toEqual("[5.0:10.0]");
 
                 // TODO implements calling default to inject real method
             });

@@ -33,7 +33,7 @@ Rectangle.prototype.transform = function(transformer) {
 }
 
 Rectangle.prototype.arrayTransform = function(arrayTransformer) {
-    var transformedArray = arrayTransformer(this.toArray)
+    var transformedArray = arrayTransformer(this.toArray())
     return new Rectangle(transformedArray[0], transformedArray[1]);
 }
 

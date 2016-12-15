@@ -1,5 +1,7 @@
 package emcastro;
 
+import java.util.Arrays;
+
 /**
  * Created by ecastro on 05/12/16.
  */
@@ -39,6 +41,11 @@ public interface JSArray<A> {
         @Override
         public int length() {
             return array.length;
+        }
+
+        @Override
+        public String toString() {
+            return Arrays.toString(array);
         }
     }
 

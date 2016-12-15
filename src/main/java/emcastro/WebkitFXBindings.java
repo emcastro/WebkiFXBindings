@@ -107,7 +107,7 @@ public class WebkitFXBindings {
                 }
             }
 
-            Object publisher = new FunctionPublisher(hasThisAnnotation, type.type, jsFunction);
+            Object publisher = new FunctionPublisher(hasThisAnnotation, (ParameterizedType) type.type, jsFunction);
 
             Object transformed = java2js.call("call", null, publisher);
 
@@ -118,14 +118,14 @@ public class WebkitFXBindings {
     }
 
     public class FunctionPublisher {
-        public FunctionPublisher(boolean hasThis, Type type, JSFunction function) {
+        public FunctionPublisher(boolean hasThis, ParameterizedType type, JSFunction function) {
             this.hasThis = hasThis;
             this.type = type;
             this.function = function;
         }
 
         final boolean hasThis;
-        final Type type;
+        final ParameterizedType type;
         final JSFunction function;
 
         public Object invoke(Object self, JSObject args) {
@@ -133,12 +133,17 @@ public class WebkitFXBindings {
             if (hasThis) length += 1;
             Object[] converted = new Object[length];
             if (hasThis) {
-                converted[0] = convertToJava(null, self); // TODO gérer les types
+                Type argType = type.getActualTypeArguments()[0];
+                converted[0] = convertToJava(argType, self);
             }
             for (int i = hasThis ? 1 : 0; i < length; i++) {
-                converted[i] = convertToJava(null, args.getSlot(i));
+                Type argType = type.getActualTypeArguments()[i];
+                converted[i] = convertToJava(argType, args.getSlot(i));
             }
-            return convertFromJava(null, function.invoke(converted));
+            return convertFromJava(
+                    new ParameterType(
+                            type.getActualTypeArguments()[length-1]),
+                    function.invoke(converted));
         }
     }
 
@@ -196,9 +201,16 @@ public class WebkitFXBindings {
 
     public boolean FAST_CALL = false;
 
+    static Annotation[] emptyAnnotation = new Annotation[0];
+
     static class ParameterType {
         final Annotation[] annotations;
         final Type type;
+
+        ParameterType(Type type) {
+            this.annotations = emptyAnnotation;
+            this.type = type;
+        }
 
         ParameterType(Annotation[] annotations, Type type) {
             this.annotations = annotations;
