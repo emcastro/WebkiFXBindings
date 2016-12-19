@@ -1,3 +1,5 @@
+"use strict";
+
 function Rectangle(width, height) {
     this.width = width;
     this.height = height;

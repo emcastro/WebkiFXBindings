@@ -3,6 +3,7 @@ package emcastro;
 import com.mscharhag.oleaster.runner.OleasterRunner;
 import javafx.scene.web.WebEngine;
 import javafx.scene.web.WebView;
+import netscape.javascript.JSException;
 import netscape.javascript.JSObject;
 import org.junit.runner.RunWith;
 
@@ -21,9 +22,9 @@ public class WebkitFXBindingsTest {
             WebView webView = new WebView();
             WebEngine engine = webView.getEngine();
 
-            WebkitFXBindings webkitFXBindings = new WebkitFXBindings(engine);
+            WebkitFXBindings js = new WebkitFXBindings(engine);
 
-            Rectangle rect = webkitFXBindings.executeScript(Rectangle.class, WebkitFXBindings.class.getResource("Rectangle.js"));
+            Rectangle rect = js.executeScript(Rectangle.class, WebkitFXBindings.class.getResource("Rectangle.js"));
 
             it("reads JS properties through getters", () -> {
                 expect(rect.width()).toEqual(5.);
@@ -54,7 +55,7 @@ public class WebkitFXBindingsTest {
             });
 
             it("stores Proxy classes into its internal classloader", () -> {
-                expect(rect.getClass().getClassLoader()).toEqual(webkitFXBindings.loader);
+                expect(rect.getClass().getClassLoader()).toEqual(js.loader);
             });
 
 
@@ -93,10 +94,9 @@ public class WebkitFXBindingsTest {
                 expect(transform.width()).toEqual(250.);
                 expect(transform.getHeight()).toEqual(500.);
 
-//                Rectangle rectangle = copy.arrayTransform(value -> new JSArray.Instance<>(value.get(1), value.get(0)));
-//                System.out.println(rectangle);
-//                expect(rectangle.width()).toEqual(10.);
-//                expect(rectangle.getHeight()).toEqual(5.);
+                Rectangle rectangle = rect.arrayTransform(value -> js.newArray(Double.class, value.get(1), value.get(0)));
+                expect(rectangle.width()).toEqual(10.);
+                expect(rectangle.getHeight()).toEqual(5.);
 
             });
 
@@ -108,6 +108,18 @@ public class WebkitFXBindingsTest {
                 expect(copy.prettyPrint()).toEqual("[5.0:10.0]");
 
                 // TODO implements calling default to inject real method
+            });
+
+            it("does not confuse undefined keyword and undefined String", () -> {
+                expect(js.executeScript(String.class, "'undefined'")).toEqual("undefined");
+                boolean crashed = false;
+                try {
+                    js.executeScript(String.class,"undefined");
+                } catch (JSException e) {
+                    expect(e.getMessage()).toEqual("Undefined value returned by Javascript");
+                    crashed = true;
+                }
+                expect(crashed).toBeTrue();
             });
         });
 

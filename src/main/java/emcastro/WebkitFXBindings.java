@@ -30,6 +30,7 @@ public class WebkitFXBindings {
     private final ParameterType[] emptyParamTypes = new ParameterType[0];
     private final String undefined;
     final JSObject java2js;
+    final JSObject newArray;
     final WebEngine engine;
 
     public WebkitFXBindings(WebEngine engine) {
@@ -43,6 +44,12 @@ public class WebkitFXBindings {
                 "}" +
                 "" +
                 "WebkitFXBinding_java2js");
+        newArray = (JSObject) engine.executeScript("" +
+                "function WebkitFXBinding_newArray() {" +
+                "   return [];" +
+                "}" +
+                "" +
+                "WebkitFXBinding_newArray");
         this.engine = engine;
     }
 
@@ -64,12 +71,9 @@ public class WebkitFXBindings {
         return executeScript(type, b.toString());
     }
 
+    @SuppressWarnings("unchecked")
     public <T> T executeScript(Class<T> type, String script) {
-        return proxy(type, (JSObject) engine.executeScript(script));
-    }
-
-    public <T> T proxy(Class<T> type, JSObject o) {
-        return proxy((Type) type, o);
+        return (T) convertToJava(type, engine.executeScript(script));
     }
 
     @SuppressWarnings("unchecked")
@@ -109,11 +113,48 @@ public class WebkitFXBindings {
 
             Object publisher = new FunctionPublisher(hasThisAnnotation, (ParameterizedType) type.type, jsFunction);
 
-            Object transformed = java2js.call("call", null, publisher);
-
-            return transformed;
+            return java2js.call("call", null, publisher);
         } else {
             return value;
+        }
+    }
+
+    @SuppressWarnings("unchecked")
+    public <T> JSArray<T> newArray(Class<T> type) {
+        return (JSArray<T>) convertToJava(new JSArraySyntheticType(type), newArray.call("call"));
+    }
+
+    @SafeVarargs
+    public final <T> JSArray<T> newArray(Class<T> type, T... elements) {
+        JSArray<T> array = newArray(type);
+        int i = 0;
+        for (T e : elements) {
+            array.set(i, e);
+            i++;
+        }
+        return array;
+    }
+
+    private static class JSArraySyntheticType implements ParameterizedType {
+        Type[] types;
+
+        public JSArraySyntheticType(Class type) {
+            types = new Type[]{type};
+        }
+
+        @Override
+        public Type[] getActualTypeArguments() {
+            return types;
+        }
+
+        @Override
+        public Type getRawType() {
+            return JSArray.class;
+        }
+
+        @Override
+        public Type getOwnerType() {
+            return null;
         }
     }
 
@@ -142,7 +183,7 @@ public class WebkitFXBindings {
             }
             return convertFromJava(
                     new ParameterType(
-                            type.getActualTypeArguments()[length-1]),
+                            type.getActualTypeArguments()[length - 1]),
                     function.invoke(converted));
         }
     }
@@ -172,7 +213,7 @@ public class WebkitFXBindings {
                 && returnClass != JSObject.class
                 && returnClass != void.class
                 && returnClass != Void.class)
-            throw new JSException("Undefined value return by Javascript");
+            throw new JSException("Undefined value returned by Javascript");
 
         if (returnClass.isAnnotationPresent(JSInterface.class)) {
             return proxy(returnType, (JSObject) value);
