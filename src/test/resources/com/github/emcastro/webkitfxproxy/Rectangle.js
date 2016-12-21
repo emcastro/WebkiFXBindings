@@ -47,5 +47,9 @@ Rectangle.prototype.prettyPrint = function() {
     }
 }
 
+Rectangle.prototype.forEach = function(action) {
+    action('width', this.width);
+    action('height', this.height);
+}
 
 new Rectangle(5,10)

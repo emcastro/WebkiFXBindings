@@ -103,6 +103,9 @@ public class WebkitFXProxyTest {
                 expect(rectangle.width()).toEqual(10.);
                 expect(rectangle.getHeight()).toEqual(5.);
 
+                StringBuilder b = new StringBuilder();
+                rect.forEach((s, d) -> b.append(s + ": " + d + "; "));
+                expect(b.toString()).toEqual("width: 5.0; height: 10.0; ");
             });
 
             it("injects methods into objects", () -> {
@@ -224,6 +227,8 @@ public class WebkitFXProxyTest {
         default String simpleFormatter() {
             return "rect:" + width() + "×" + getHeight();
         }
+
+        void forEach(JSRunnable2<String, Double> action);
     }
 
 }

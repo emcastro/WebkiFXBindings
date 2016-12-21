@@ -77,17 +77,6 @@ public class WebkitFXProxy {
         return (T) convertToJava(type, engine.executeScript(script));
     }
 
-    @SuppressWarnings("unchecked")
-    private <T> T proxy(Type type, JSObject o) {
-        Class<?> clazz = getClass(type);
-
-        if (clazz.isAnnotationPresent(JSInterface.class)) {
-            return (T) Proxy.newProxyInstance(loader, new Class[]{clazz}, new JSInvocationHandler(o, type));
-        } else {
-            throw new IllegalArgumentException("The type argument must be an interface with the @JSInterface annotation: " + type);
-        }
-    }
-
     private static Class<?> getClass(Type type) {
         Class<?> clazz;
         if (type instanceof ParameterizedType) {
@@ -99,6 +88,8 @@ public class WebkitFXProxy {
     }
 
     private Object convertFromJava(ParameterType type, Object value) {
+        if (value == null) return null;
+
         if (value.getClass().getClassLoader() == loader) {
             JSInvocationHandler handler = (JSInvocationHandler) Proxy.getInvocationHandler(value);
             return handler.jsObject;
@@ -106,13 +97,16 @@ public class WebkitFXProxy {
             JSFunction jsFunction = (JSFunction) value;
 
             boolean hasThisAnnotation = false;
+            boolean rawArguments = false;
             for (Annotation annotation : type.annotations) {
                 if (annotation instanceof This) {
                     hasThisAnnotation = true;
+                } else if (annotation instanceof RawArguments) {
+                    rawArguments = true;
                 }
             }
 
-            Object publisher = new FunctionPublisher(hasThisAnnotation, (ParameterizedType) type.type, jsFunction);
+            Object publisher = new FunctionPublisher(hasThisAnnotation, rawArguments, (ParameterizedType) type.type, jsFunction);
 
             return java2js.call("call", null, publisher);
         } else {
@@ -160,32 +154,69 @@ public class WebkitFXProxy {
     }
 
     public class FunctionPublisher {
-        public FunctionPublisher(boolean hasThis, ParameterizedType type, JSFunction function) {
+        public FunctionPublisher(boolean hasThis, boolean rawArgument, ParameterizedType type, JSFunction function) {
             this.hasThis = hasThis;
+            this.rawArgument = rawArgument;
             this.type = type;
             this.function = function;
         }
 
         final boolean hasThis;
+        final boolean rawArgument;
         final ParameterizedType type;
         final JSFunction function;
 
         public Object invoke(Object self, JSObject args) {
             int length = (int) args.getMember("length");
-            if (hasThis) length += 1;
-            Object[] converted = new Object[length];
-            if (hasThis) {
-                Type argType = type.getActualTypeArguments()[0];
-                converted[0] = convertToJava(argType, self);
+            if (rawArgument) {
+                Object[] argArray = new Object[length];
+                for (int i = 0; i < length; i++) {
+                    argArray[i] = args.getSlot(i);
+                }
+
+                if (hasThis) {
+                    Type thisType = type.getActualTypeArguments()[0];
+                    if (function instanceof JSRunnable2) {
+                        ((JSRunnable2) function).call(convertToJava(thisType, self), argArray);
+                        return null;
+                    } else {
+                        return convertFromJava(
+                                new ParameterType(
+                                        type.getActualTypeArguments()[length - 1]),
+                                ((JSFunction2) function).call(convertToJava(thisType, self), argArray));
+                    }
+                } else {
+                    if (function instanceof JSRunnable1) {
+                        ((JSRunnable1) function).call(argArray);
+                        return null;
+                    } else {
+                        return convertFromJava(
+                                new ParameterType(
+                                        type.getActualTypeArguments()[length - 1]),
+                                ((JSFunction1) function).call(argArray));
+                    }
+                }
+            } else {
+                if (hasThis) length += 1;
+
+                Object[] converted = new Object[length];
+                if (hasThis) {
+                    Type argType = type.getActualTypeArguments()[0];
+                    converted[0] = convertToJava(argType, self);
+                }
+                for (int i = hasThis ? 1 : 0; i < length; i++) {
+                    Type argType = type.getActualTypeArguments()[i];
+                    converted[i] = convertToJava(argType, args.getSlot(i));
+                }
+                if (function instanceof JSRunnable) {
+                    return function.invoke(converted); // always return null
+                } else {
+                    return convertFromJava(
+                            new ParameterType(
+                                    type.getActualTypeArguments()[length - 1]),
+                            function.invoke(converted));
+                }
             }
-            for (int i = hasThis ? 1 : 0; i < length; i++) {
-                Type argType = type.getActualTypeArguments()[i];
-                converted[i] = convertToJava(argType, args.getSlot(i));
-            }
-            return convertFromJava(
-                    new ParameterType(
-                            type.getActualTypeArguments()[length - 1]),
-                    function.invoke(converted));
         }
     }
 
@@ -206,6 +237,9 @@ public class WebkitFXProxy {
             return values; // Don't let escape unnecessary new Object[]
     }
 
+    public <T> T convertToJava(Class<T> returnType, Object value) {
+        return (T) convertToJava((Type) returnType, value);
+    }
 
     private Object convertToJava(Type returnType, Object value) {
         Class<?> returnClass = getClass(returnType);
@@ -217,7 +251,8 @@ public class WebkitFXProxy {
             throw new JSException("Undefined value returned by Javascript");
 
         if (returnClass.isAnnotationPresent(JSInterface.class)) {
-            return proxy(returnType, (JSObject) value);
+            Class<?> clazz = getClass(returnType);
+            return Proxy.newProxyInstance(loader, new Class[]{clazz}, new JSInvocationHandler((JSObject) value, returnType));
         } else if (returnClass.isAssignableFrom(Double.class)) {
             // convert integer to Double
             if (value instanceof Integer) {

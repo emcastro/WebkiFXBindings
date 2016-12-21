@@ -10,7 +10,7 @@ public interface JSRunnable3<A, B, C> extends JSFunction {
 
     @Override
     default Object invoke(Object[] arguments) {
-        checkArity(arguments, 1);
+        checkArity(arguments, 3);
         call((A) arguments[0], (B) arguments[1], (C) arguments[2]);
         return null;
     }

@@ -10,7 +10,7 @@ public interface JSFunction3<A, B, C, R> extends JSFunction {
 
     @Override
     default Object invoke(Object[] arguments) {
-        checkArity(arguments, 1);
+        checkArity(arguments, 3);
         return call((A) arguments[0], (B) arguments[1], (C) arguments[2]);
     }
 }
