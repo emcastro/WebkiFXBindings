@@ -7,6 +7,11 @@ import netscape.javascript.JSException;
 import netscape.javascript.JSObject;
 import org.junit.runner.RunWith;
 
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
+import java.util.stream.Collectors;
+
 import static com.mscharhag.oleaster.matcher.Matchers.expect;
 import static emcastro.util.FXTest.describe;
 import static emcastro.util.FXTest.it;
@@ -16,15 +21,15 @@ import static emcastro.util.FXTest.it;
  * Created by ecastro on 04/12/16.
  */
 @RunWith(OleasterRunner.class)
-public class WebkitFXBindingsTest {
+public class WebkitFXProxyTest {
     {
-        describe("WebkitFXBindings", () -> {
+        describe("WebkitFXProxy", () -> {
             WebView webView = new WebView();
             WebEngine engine = webView.getEngine();
 
-            WebkitFXBindings js = new WebkitFXBindings(engine);
+            WebkitFXProxy proxy = new WebkitFXProxy(engine);
 
-            Rectangle rect = js.executeScript(Rectangle.class, WebkitFXBindings.class.getResource("Rectangle.js"));
+            Rectangle rect = proxy.executeScript(Rectangle.class, WebkitFXProxy.class.getResource("Rectangle.js"));
 
             it("reads JS properties through getters", () -> {
                 expect(rect.width()).toEqual(5.);
@@ -55,7 +60,7 @@ public class WebkitFXBindingsTest {
             });
 
             it("stores Proxy classes into its internal classloader", () -> {
-                expect(rect.getClass().getClassLoader()).toEqual(js.loader);
+                expect(rect.getClass().getClassLoader()).toEqual(proxy.loader);
             });
 
 
@@ -71,7 +76,7 @@ public class WebkitFXBindingsTest {
                 expect(rect2.surface()).toEqual(.5);
             });
 
-            it("handle JS arrays", () -> {
+            it("handles JS arrays", () -> {
                 JSArray<Double> array = rect.toArray();
                 expect(array.get(0)).toEqual(5.);
                 expect(array.get(1)).toEqual(10.);
@@ -94,7 +99,7 @@ public class WebkitFXBindingsTest {
                 expect(transform.width()).toEqual(250.);
                 expect(transform.getHeight()).toEqual(500.);
 
-                Rectangle rectangle = rect.arrayTransform(value -> js.newArray(Double.class, value.get(1), value.get(0)));
+                Rectangle rectangle = rect.arrayTransform(value -> proxy.newArray(Double.class, value.get(1), value.get(0)));
                 expect(rectangle.width()).toEqual(10.);
                 expect(rectangle.getHeight()).toEqual(5.);
 
@@ -107,19 +112,31 @@ public class WebkitFXBindingsTest {
                 copy.setFormatter(self -> "[" + self.width() + ":" + self.getHeight() + "]");
                 expect(copy.prettyPrint()).toEqual("[5.0:10.0]");
 
-                // TODO implements calling default to inject real method
+                copy.setFormatter(Rectangle::simpleFormatter);
+                expect(copy.prettyPrint()).toEqual("rect:5.0×10.0");
             });
 
             it("does not confuse undefined keyword and undefined String", () -> {
-                expect(js.executeScript(String.class, "'undefined'")).toEqual("undefined");
+                expect(proxy.executeScript(String.class, "'undefined'")).toEqual("undefined");
                 boolean crashed = false;
                 try {
-                    js.executeScript(String.class,"undefined");
+                    proxy.executeScript(String.class, "undefined");
                 } catch (JSException e) {
                     expect(e.getMessage()).toEqual("Undefined value returned by Javascript");
                     crashed = true;
                 }
                 expect(crashed).toBeTrue();
+            });
+
+            it("has useful array support", () -> {
+                List<Double> result = Arrays.asList(1.0, 2.0, 3.0, 4.0);
+                JSArray<Rectangle> array = proxy.executeScript(JSArray_Rectangle.class, "[ new Rectangle(1,2), new Rectangle(3,4) ]");
+
+                expect(array.stream().flatMap(r -> r.toArray().stream()).collect(Collectors.toList())).toEqual(result);
+
+                ArrayList<Object> objects = new ArrayList<>();
+                array.toList().forEach(r -> r.toArray().forEach(objects::add));
+                expect(objects).toEqual(result);
             });
         });
 
@@ -128,11 +145,11 @@ public class WebkitFXBindingsTest {
                 WebView webView = new WebView();
                 WebEngine engine = webView.getEngine();
 
-                WebkitFXBindings webkitFXBindings = new WebkitFXBindings(engine);
+                WebkitFXProxy webkitFXProxy = new WebkitFXProxy(engine);
 
-                JSObject obj = (JSObject) webkitFXBindings.engine.executeScript("r={value: 22}; r");
+                JSObject obj = (JSObject) webkitFXProxy.engine.executeScript("r={value: 22}; r");
 
-                JSObject js = (JSObject) webkitFXBindings.java2js.call("call", null, new FunctionPublisher());
+                JSObject js = (JSObject) webkitFXProxy.java2js.call("call", null, new FunctionPublisher());
                 expect(js.toString()).toStartWith("function javaCall()");
                 expect(js.call("call", obj, 42, 24)).toEqual(88); // 42+24+22
             });
@@ -146,6 +163,10 @@ public class WebkitFXBindingsTest {
             return (int) args.getSlot(0) + (int) args.getSlot(1) + (int) self.getMember("value");
         }
 
+    }
+
+    @JSInterface
+    public interface JSArray_Rectangle extends JSArray<Rectangle> {
     }
 
     @JSInterface
@@ -199,6 +220,10 @@ public class WebkitFXBindingsTest {
         void setFormatter(@This JSFunction1<Rectangle, String> function);
 
         String prettyPrint();
+
+        default String simpleFormatter() {
+            return "rect:" + width() + "×" + getHeight();
+        }
     }
 
 }

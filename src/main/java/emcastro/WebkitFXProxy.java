@@ -8,13 +8,14 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.lang.annotation.Annotation;
+import java.lang.invoke.MethodHandles;
 import java.lang.reflect.*;
 import java.net.URL;
 
 /**
  * Created by ecastro on 04/12/16.
  */
-public class WebkitFXBindings {
+public class WebkitFXProxy {
 
     /**
      * Classloader to store the proxy class
@@ -22,7 +23,7 @@ public class WebkitFXBindings {
     ClassLoader loader = new ClassLoader() {
         @Override
         public String toString() {
-            return "ClassLoader for " + WebkitFXBindings.this;
+            return "ClassLoader for " + WebkitFXProxy.this;
         }
     };
 
@@ -33,7 +34,7 @@ public class WebkitFXBindings {
     final JSObject newArray;
     final WebEngine engine;
 
-    public WebkitFXBindings(WebEngine engine) {
+    public WebkitFXProxy(WebEngine engine) {
         undefined = (String) engine.executeScript("undefined");
         java2js = (JSObject) engine.executeScript("" +
                 "function WebkitFXBinding_java2js(javaFunction) {" +
@@ -301,6 +302,13 @@ public class WebkitFXBindings {
         @Override
         public Object invoke(Object proxy, Method method, Object[] args) throws Throwable {
 
+            if (method.isDefault()) {
+                return constructor.newInstance(method.getDeclaringClass(), MethodHandles.Lookup.PRIVATE)
+                        .unreflectSpecial(method, method.getDeclaringClass())
+                        .bindTo(proxy)
+                        .invokeWithArguments(args);
+            }
+
             ParameterType[] paramTypes = parameterTypes(method);
             if (args == null) {
                 args = empty;
@@ -366,14 +374,21 @@ public class WebkitFXBindings {
         private Type resolveType(Type returnType) {
             if (returnType instanceof TypeVariable) {
                 // Resolve the type variable
-                TypeVariable[] typeParameters = ((Class) ((ParameterizedType) type).getRawType()).getTypeParameters();
+                ParameterizedType pType;
+                if (type instanceof ParameterizedType) {
+                    pType = (ParameterizedType) type;
+                } else {
+                    // The user defined a non parametrized interface to encapsulate type parameters in a Class object?
+                    pType = (ParameterizedType) ((Class) type).getGenericInterfaces()[0];
+                }
+                TypeVariable[] typeParameters = ((Class) pType.getRawType()).getTypeParameters();
                 int i;
                 for (i = 0; i < typeParameters.length; i++) {
                     if (typeParameters[i].equals(returnType)) break;
                 }
                 if (i == typeParameters.length) throw new AssertionError("Type parameter not found");
 
-                returnType = ((ParameterizedType) type).getActualTypeArguments()[i];
+                returnType = pType.getActualTypeArguments()[i];
             }
 
             if (returnType instanceof Class && ((Class) returnType).getTypeParameters().length != 0) {
@@ -384,5 +399,18 @@ public class WebkitFXBindings {
         }
 
     }
+
+
+    private static final Constructor<MethodHandles.Lookup> constructor;
+
+    static {
+        try {
+            constructor = MethodHandles.Lookup.class.getDeclaredConstructor(Class.class, int.class);
+            constructor.setAccessible(true);
+        } catch (NoSuchMethodException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
 
 }
