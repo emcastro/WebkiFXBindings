@@ -1,4 +1,4 @@
-package emcastro;
+package com.github.emcastro.webkitfxproxy;
 
 import javafx.scene.web.WebEngine;
 import netscape.javascript.JSException;

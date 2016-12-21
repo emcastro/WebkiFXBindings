@@ -1,4 +1,4 @@
-package emcastro.util;
+package com.github.emcastro.webkitfxproxy;
 
 import com.mscharhag.oleaster.runner.Invokable;
 import com.mscharhag.oleaster.runner.StaticRunnerSupport;

@@ -12,7 +12,7 @@ repositories {
 sourceCompatibility = '1.8'
 targetCompatibility = '1.8'
 
-group = 'emcastro'
+group = 'com.github.emcastro'
 
 dependencies {
     testCompile 'junit:junit:4.12'
@@ -66,21 +66,21 @@ if(doUploadArchives) {
             }
 
             pom.project {
-                name 'WebkitFXBindings'
+                name 'WebkitFXProxy'
                 packaging 'jar'
-                description 'Java-Interface typed bindings for JavaFX Webkit objects.'
-                url 'http://www.github.com/emcastro/WebkitFXBindings'
+                description 'Typed proxying for JavaFX Webkit objects.'
+                url 'http://www.github.com/com.github.emcastro/WebkitFXProxy'
              
                 scm {
-                    url 'scm:git@github.com:emcastro/WebkitFXBindings.git'
-                    connection 'scm:git@github.com:emcastro/WebkitFXBindings.git'
-                    developerConnection 'scm:git@github.com:emcastro/WebkitFXBindings.git'
+                    url 'scm:git@github.com:com.github.emcastro/WebkitFXProxy.git'
+                    connection 'scm:git@github.com:com.github.emcastro/WebkitFXProxy.git'
+                    developerConnection 'scm:git@github.com:com.github.emcastro/WebkitFXProxy.git'
                 }
              
                 licenses {
                     license {
-                        name 'The BSD 2-Clause License'
-                        url 'http://opensource.org/licenses/BSD-2-Clause'
+                        name 'MIT'
+                        url 'https://opensource.org/licenses/MIT'
                         distribution 'repo'
                     }
                 }

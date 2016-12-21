@@ -1,4 +1,4 @@
-package emcastro;
+package com.github.emcastro.webkitfxproxy;
 
 import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;

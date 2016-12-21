@@ -1,4 +1,4 @@
-package emcastro;
+package com.github.emcastro.webkitfxproxy;
 
 /**
  * Created by ecastro on 05/12/16.

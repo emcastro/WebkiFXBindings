@@ -1,4 +1,4 @@
-package emcastro;
+package com.github.emcastro.webkitfxproxy;
 
 import com.mscharhag.oleaster.runner.OleasterRunner;
 import javafx.scene.web.WebEngine;
@@ -13,8 +13,8 @@ import java.util.List;
 import java.util.stream.Collectors;
 
 import static com.mscharhag.oleaster.matcher.Matchers.expect;
-import static emcastro.util.FXTest.describe;
-import static emcastro.util.FXTest.it;
+import static com.github.emcastro.webkitfxproxy.FXTest.describe;
+import static com.github.emcastro.webkitfxproxy.FXTest.it;
 
 
 /**

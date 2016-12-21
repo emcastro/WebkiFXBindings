@@ -1,4 +1,4 @@
-package emcastro;
+package com.github.emcastro.webkitfxproxy;
 
 import java.util.ArrayList;
 import java.util.Iterator;

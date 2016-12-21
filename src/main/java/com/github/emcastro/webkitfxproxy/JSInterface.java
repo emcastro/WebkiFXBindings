@@ -1,11 +1,11 @@
-package emcastro;
+package com.github.emcastro.webkitfxproxy;
 
 import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
 
 /**
- * Created by ecastro on 05/12/16.
+ * Indicates that an interface encapsulates a JSObject
  */
 @Retention(RetentionPolicy.RUNTIME)
-public @interface Getter {
+public @interface JSInterface {
 }
