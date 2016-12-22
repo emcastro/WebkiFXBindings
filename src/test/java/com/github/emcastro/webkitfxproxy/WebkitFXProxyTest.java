@@ -184,7 +184,7 @@ public class WebkitFXProxyTest {
 
         // property in Java syntax
         @Getter
-        Double getHeight();
+        double getHeight();
 
         @Setter
         void setHeight(double height);

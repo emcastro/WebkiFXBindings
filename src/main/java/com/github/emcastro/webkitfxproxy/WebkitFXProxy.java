@@ -253,7 +253,7 @@ public class WebkitFXProxy {
         if (returnClass.isAnnotationPresent(JSInterface.class)) {
             Class<?> clazz = getClass(returnType);
             return Proxy.newProxyInstance(loader, new Class[]{clazz}, new JSInvocationHandler((JSObject) value, returnType));
-        } else if (returnClass.isAssignableFrom(Double.class)) {
+        } else if (returnClass.isAssignableFrom(Double.class) || returnClass.isAssignableFrom(double.class)) {
             // convert integer to Double
             if (value instanceof Integer) {
                 return ((Integer) value).doubleValue();
