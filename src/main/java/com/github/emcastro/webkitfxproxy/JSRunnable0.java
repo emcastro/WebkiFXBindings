@@ -4,14 +4,17 @@ package com.github.emcastro.webkitfxproxy;
  * Created by ecastro on 05/12/16.
  */
 @JSInterface
-public interface JSRunnable0 extends JSFunction {
+public interface JSRunnable0 extends JSRunnable {
 
     void call();
 
     @Override
-    default Object invoke(Object[] arguments) {
-        checkArity(arguments, 0);
+    default int arity() {
+        return 0;
+    }
+
+    @Override
+    default void invoke(Object[] arguments) {
         call();
-        return null;
     }
 }

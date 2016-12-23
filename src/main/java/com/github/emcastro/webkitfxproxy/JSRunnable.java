@@ -3,8 +3,10 @@ package com.github.emcastro.webkitfxproxy;
 /**
  * Created by ecastro on 12/12/16.
  */
-public interface JSRunnable extends JSFunction {
+interface JSRunnable {
 
-    Void invoke(Object[] arguments);
+    void invoke(Object[] arguments);
+
+    int arity();
 
 }

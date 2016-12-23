@@ -10,6 +10,7 @@ import org.junit.runner.RunWith;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
 
 import static com.mscharhag.oleaster.matcher.Matchers.expect;
@@ -102,10 +103,6 @@ public class WebkitFXProxyTest {
                 Rectangle rectangle = rect.arrayTransform(value -> proxy.newArray(Double.class, value.get(1), value.get(0)));
                 expect(rectangle.width()).toEqual(10.);
                 expect(rectangle.getHeight()).toEqual(5.);
-
-                StringBuilder b = new StringBuilder();
-                rect.forEach((s, d) -> b.append(s + ": " + d + "; "));
-                expect(b.toString()).toEqual("width: 5.0; height: 10.0; ");
             });
 
             it("injects methods into objects", () -> {
@@ -155,6 +152,72 @@ public class WebkitFXProxyTest {
                 JSObject js = (JSObject) webkitFXProxy.java2js.call("call", null, new FunctionPublisher());
                 expect(js.toString()).toStartWith("function javaCall()");
                 expect(js.call("call", obj, 42, 24)).toEqual(88); // 42+24+22
+            });
+        });
+
+        describe("JSRunnable and JSFunction", () -> {
+            WebView webView = new WebView();
+            WebEngine engine = webView.getEngine();
+
+            WebkitFXProxy proxy = new WebkitFXProxy(engine);
+
+            RunnableTester r = proxy.executeScript(RunnableTester.class, WebkitFXProxy.class.getResource("Runnable.js"));
+
+
+            it("behaves correctly", () -> {
+                AtomicInteger i = new AtomicInteger(0);
+                r.r0(() -> i.addAndGet(1));
+                r.r1((b1) -> {
+                    expect(b1.check(1)).toBeTrue();
+                    i.addAndGet(2);
+                });
+                r.r2((b1, b2) -> {
+                    expect(b1.check(2)).toBeTrue();
+                    expect(b2.check(3)).toBeTrue();
+                    i.addAndGet(4);
+                });
+                r.r3((b1, b2, b3) -> {
+                    expect(b1.check(4)).toBeTrue();
+                    expect(b2.check(5)).toBeTrue();
+                    expect(b3.check(6)).toBeTrue();
+                    i.addAndGet(8);
+                });
+
+                r.f0(() -> {
+                    i.addAndGet(16);
+                    return null;
+                });
+                r.f1((b1) -> {
+                    expect(b1.check(1)).toBeTrue();
+                    i.addAndGet(32);
+                    return proxy.executeScript(JSBidule.class, "new JSBidule(11)");
+                });
+                r.f2((b1, b2) -> {
+                    expect(b1.check(2)).toBeTrue();
+                    expect(b2.check(3)).toBeTrue();
+                    i.addAndGet(64);
+                    return null;
+                });
+                r.f3((b1, b2, b3) -> {
+                    expect(b1.check(4)).toBeTrue();
+                    expect(b2.check(5)).toBeTrue();
+                    expect(b3.check(6)).toBeTrue();
+                    i.addAndGet(128);
+                    return proxy.executeScript(JSBidule.class, "new JSBidule(33)");
+                });
+
+                JSObject result = r.run();
+                expect(result.getMember("r0") == proxy.undefined).toBeTrue();
+                expect(result.getMember("r1") == proxy.undefined).toBeTrue();
+                expect(result.getMember("r2") == proxy.undefined).toBeTrue();
+                expect(result.getMember("r3") == proxy.undefined).toBeTrue();
+
+                expect(result.getMember("f0") ).toBeNull();
+                expect(proxy.convertToJava(JSBidule.class, result.getMember("f1")).check(11)).toBeTrue();
+                expect(result.getMember("f2") ).toBeNull();
+                expect(proxy.convertToJava(JSBidule.class, result.getMember("f3")).check(33)).toBeTrue();
+
+                expect(i.get()).toEqual(1 + 2 + 4 + 8 + 16 + 32 + 64 + 128);
             });
         });
     }
@@ -227,8 +290,41 @@ public class WebkitFXProxyTest {
         default String simpleFormatter() {
             return "rect:" + width() + "×" + getHeight();
         }
+    }
 
-        void forEach(JSRunnable2<String, Double> action);
+    @JSInterface
+    public interface JSBidule {
+        boolean check(double value);
+    }
+
+    @JSInterface
+    public interface RunnableTester {
+        @Setter
+        void r0(JSRunnable0 r);
+
+        @Setter
+        void r1(JSRunnable1<JSBidule> r);
+
+        @Setter
+        void r2(JSRunnable2<JSBidule, JSBidule> r);
+
+        @Setter
+        void r3(JSRunnable3<JSBidule, JSBidule, JSBidule> r);
+
+        @Setter
+        void f0(JSFunction0<JSBidule> f);
+
+        @Setter
+        void f1(JSFunction1<JSBidule, JSBidule> f);
+
+        @Setter
+        void f2(JSFunction2<JSBidule, JSBidule, JSBidule> f);
+
+        @Setter
+        void f3(JSFunction3<JSBidule, JSBidule, JSBidule, JSBidule> f);
+
+        JSObject run();
+
     }
 
 }
