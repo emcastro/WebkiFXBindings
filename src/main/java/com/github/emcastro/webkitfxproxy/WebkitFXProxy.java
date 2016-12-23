@@ -77,14 +77,12 @@ public class WebkitFXProxy {
         return (T) convertToJava(type, engine.executeScript(script));
     }
 
-    private static Class<?> getClass(Type type) {
-        Class<?> clazz;
+    private static Class<?> toClass(Type type) {
         if (type instanceof ParameterizedType) {
-            clazz = (Class) ((ParameterizedType) type).getRawType();
+            return (Class) ((ParameterizedType) type).getRawType();
         } else {
-            clazz = (Class) type;
+            return (Class) type;
         }
-        return clazz;
     }
 
     private Object convertFromJava(ParameterType type, Object value) {
@@ -215,17 +213,18 @@ public class WebkitFXProxy {
                     argArray[i] = args.getSlot(i);
                 }
 
+                Type[] actualTypeArguments = type.getActualTypeArguments();
                 if (hasThis) {
-                    Type thisType = type.getActualTypeArguments()[0];
+                    Type thisType = actualTypeArguments[0];
                     return convertFromJava(
                             new ParameterType(
-                                    type.getActualTypeArguments()[length - 1]),
+                                    actualTypeArguments[actualTypeArguments.length - 1]),
                             ((JSFunction2) function).call(convertToJava(thisType, self), argArray));
 
                 } else {
                     return convertFromJava(
                             new ParameterType(
-                                    type.getActualTypeArguments()[length - 1]),
+                                    actualTypeArguments[actualTypeArguments.length - 1]),
                             ((JSFunction1) function).call(argArray));
                 }
             } else {
@@ -244,7 +243,7 @@ public class WebkitFXProxy {
                 }
                 for (int i = hasThis ? 1 : 0; i < length; i++) {
                     Type argType = actualTypeArguments[i];
-                    converted[i] = convertToJava(argType, args.getSlot(i));
+                    converted[i] = convertToJava(argType, args.getSlot(hasThis ? i - 1 : i));
                 }
                 return convertFromJava(
                         new ParameterType(actualTypeArguments[actualTypeArguments.length - 1]),
@@ -297,7 +296,7 @@ public class WebkitFXProxy {
                 }
                 for (int i = hasThis ? 1 : 0; i < length; i++) {
                     Type argType = actualTypeArguments[i];
-                    converted[i] = convertToJava(argType, args.getSlot(i));
+                    converted[i] = convertToJava(argType, args.getSlot(hasThis ? i - 1 : i));
                 }
                 function.invoke(converted);
             }
@@ -327,16 +326,16 @@ public class WebkitFXProxy {
     }
 
     private Object convertToJava(Type returnType, Object value) {
-        Class<?> returnClass = getClass(returnType);
+        Class<?> returnClass = toClass(returnType);
 
         if (value == undefined // identity comparison
                 && returnClass != JSObject.class
                 && returnClass != void.class
                 && returnClass != Void.class)
-            throw new JSException("Undefined value returned by Javascript");
+            throw new JSException("Unexpected undefined value returned by Javascript. Awaiting " + returnClass.getName());
 
         if (returnClass.isAnnotationPresent(JSInterface.class)) {
-            Class<?> clazz = getClass(returnType);
+            Class<?> clazz = toClass(returnType);
             return Proxy.newProxyInstance(loader, new Class[]{clazz}, new JSInvocationHandler((JSObject) value, returnType));
         } else if (returnClass.isAssignableFrom(Double.class) || returnClass.isAssignableFrom(double.class)) {
             // convert integer to Double
@@ -423,6 +422,7 @@ public class WebkitFXProxy {
         public Object invoke(Object proxy, Method method, Object[] args) throws Throwable {
 
             if (method.isDefault()) {
+                // TODO broken in Java9
                 return constructor.newInstance(method.getDeclaringClass(), MethodHandles.Lookup.PRIVATE)
                         .unreflectSpecial(method, method.getDeclaringClass())
                         .bindTo(proxy)

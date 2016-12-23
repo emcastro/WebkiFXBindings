@@ -122,7 +122,7 @@ public class WebkitFXProxyTest {
                 try {
                     proxy.executeScript(String.class, "undefined");
                 } catch (JSException e) {
-                    expect(e.getMessage()).toEqual("Undefined value returned by Javascript");
+                    expect(e.getMessage()).toEqual("Unexpected undefined value returned by Javascript. Awaiting java.lang.String");
                     crashed = true;
                 }
                 expect(crashed).toBeTrue();
@@ -155,7 +155,7 @@ public class WebkitFXProxyTest {
             });
         });
 
-        describe("JSRunnable and JSFunction", () -> {
+        describe("Standard calls", () -> {
             WebView webView = new WebView();
             WebEngine engine = webView.getEngine();
 
@@ -164,7 +164,7 @@ public class WebkitFXProxyTest {
             RunnableTester r = proxy.executeScript(RunnableTester.class, WebkitFXProxy.class.getResource("Runnable.js"));
 
 
-            it("behaves correctly", () -> {
+            it("behaves correctly with JSRunnable", () -> {
                 AtomicInteger i = new AtomicInteger(0);
                 r.r0(() -> i.addAndGet(1));
                 r.r1((b1) -> {
@@ -182,6 +182,19 @@ public class WebkitFXProxyTest {
                     expect(b3.check(6)).toBeTrue();
                     i.addAndGet(8);
                 });
+
+                JSObject result = r.runR();
+                expect(result.getMember("r0") == proxy.undefined).toBeTrue();
+                expect(result.getMember("r1") == proxy.undefined).toBeTrue();
+                expect(result.getMember("r2") == proxy.undefined).toBeTrue();
+                expect(result.getMember("r3") == proxy.undefined).toBeTrue();
+
+                expect(i.get()).toEqual(1 + 2 + 4 + 8);
+            });
+
+
+            it("bahaves correctly with JSFunction", () -> {
+                AtomicInteger i = new AtomicInteger(0);
 
                 r.f0(() -> {
                     i.addAndGet(16);
@@ -206,20 +219,259 @@ public class WebkitFXProxyTest {
                     return proxy.executeScript(JSBidule.class, "new JSBidule(33)");
                 });
 
-                JSObject result = r.run();
+                JSObject result = r.runF();
+                expect(result.getMember("f0")).toBeNull();
+                expect(proxy.convertToJava(JSBidule.class, result.getMember("f1")).check(11)).toBeTrue();
+                expect(result.getMember("f2")).toBeNull();
+                expect(proxy.convertToJava(JSBidule.class, result.getMember("f3")).check(33)).toBeTrue();
+
+                expect(i.get()).toEqual(16 + 32 + 64 + 128);
+            });
+        });
+
+        describe("Calls with @This", () -> {
+            WebView webView = new WebView();
+            WebEngine engine = webView.getEngine();
+
+            WebkitFXProxy proxy = new WebkitFXProxy(engine);
+
+            RunnableTesterThis r = proxy.executeScript(RunnableTesterThis.class, WebkitFXProxy.class.getResource("Runnable.js"));
+
+
+            it("behaves correctly with JSRunnable", () -> {
+                AtomicInteger i = new AtomicInteger(0);
+                r.r0((self) -> i.addAndGet(1));
+                r.r1((self, b1) -> {
+                    expect(b1.check(1)).toBeTrue();
+                    i.addAndGet(2);
+                });
+                r.r2((self, b1, b2) -> {
+                    expect(b1.check(2)).toBeTrue();
+                    expect(b2.check(3)).toBeTrue();
+                    i.addAndGet(4);
+                });
+                r.r3((self, b1, b2, b3) -> {
+                    expect(b1.check(4)).toBeTrue();
+                    expect(b2.check(5)).toBeTrue();
+                    expect(b3.check(6)).toBeTrue();
+                    i.addAndGet(8);
+                });
+
+                JSObject result = r.runR();
                 expect(result.getMember("r0") == proxy.undefined).toBeTrue();
                 expect(result.getMember("r1") == proxy.undefined).toBeTrue();
                 expect(result.getMember("r2") == proxy.undefined).toBeTrue();
                 expect(result.getMember("r3") == proxy.undefined).toBeTrue();
 
-                expect(result.getMember("f0") ).toBeNull();
+                expect(i.get()).toEqual(1 + 2 + 4 + 8);
+            });
+
+
+            it("bahaves correctly with JSFunction", () -> {
+                AtomicInteger i = new AtomicInteger(0);
+
+                r.f0((self) -> {
+                    i.addAndGet(16);
+                    return null;
+                });
+                r.f1((self, b1) -> {
+                    expect(b1.check(1)).toBeTrue();
+                    i.addAndGet(32);
+                    return proxy.executeScript(JSBidule.class, "new JSBidule(11)");
+                });
+                r.f2((self, b1, b2) -> {
+                    expect(b1.check(2)).toBeTrue();
+                    expect(b2.check(3)).toBeTrue();
+                    i.addAndGet(64);
+                    return null;
+                });
+                r.f3((self, b1, b2, b3) -> {
+                    expect(b1.check(4)).toBeTrue();
+                    expect(b2.check(5)).toBeTrue();
+                    expect(b3.check(6)).toBeTrue();
+                    i.addAndGet(128);
+                    return proxy.executeScript(JSBidule.class, "new JSBidule(33)");
+                });
+
+                JSObject result = r.runF();
+                expect(result.getMember("f0")).toBeNull();
                 expect(proxy.convertToJava(JSBidule.class, result.getMember("f1")).check(11)).toBeTrue();
-                expect(result.getMember("f2") ).toBeNull();
+                expect(result.getMember("f2")).toBeNull();
                 expect(proxy.convertToJava(JSBidule.class, result.getMember("f3")).check(33)).toBeTrue();
 
-                expect(i.get()).toEqual(1 + 2 + 4 + 8 + 16 + 32 + 64 + 128);
+                expect(i.get()).toEqual(16 + 32 + 64 + 128);
             });
         });
+
+
+        describe("Calls with @RawArgument", () -> {
+            WebView webView = new WebView();
+            WebEngine engine = webView.getEngine();
+
+            WebkitFXProxy proxy = new WebkitFXProxy(engine);
+
+            RunnableTesterRaw r = proxy.executeScript(RunnableTesterRaw.class, WebkitFXProxy.class.getResource("Runnable.js"));
+
+
+            it("behaves correctly with JSRunnable", () -> {
+                AtomicInteger i = new AtomicInteger(0);
+                r.r0((args) -> {
+                    i.addAndGet(1);
+                    expect(args.length).toEqual(0);
+                });
+                r.r1((args) -> {
+                    expect(((JSObject)args[0]).call("check", 1)).toEqual(true);
+                    i.addAndGet(2);
+                });
+                r.r2((args) -> {
+                    expect(((JSObject)args[0]).call("check", 2)).toEqual(true);
+                    expect(((JSObject)args[1]).call("check", 3)).toEqual(true);
+                    i.addAndGet(4);
+                });
+                r.r3((args) -> {
+                    expect(((JSObject)args[0]).call("check", 4)).toEqual(true);
+                    expect(((JSObject)args[1]).call("check", 5)).toEqual(true);
+                    expect(((JSObject)args[2]).call("check", 6)).toEqual(true);
+
+                    i.addAndGet(8);
+                });
+
+                JSObject result = r.runR();
+                expect(result.getMember("r0") == proxy.undefined).toBeTrue();
+                expect(result.getMember("r1") == proxy.undefined).toBeTrue();
+                expect(result.getMember("r2") == proxy.undefined).toBeTrue();
+                expect(result.getMember("r3") == proxy.undefined).toBeTrue();
+
+                expect(i.get()).toEqual(1 + 2 + 4 + 8);
+            });
+
+
+            it("bahaves correctly with JSFunction", () -> {
+                AtomicInteger i = new AtomicInteger(0);
+
+                r.f0((args) -> {
+                    i.addAndGet(16);
+                    expect(args.length).toEqual(0);
+                    return null;
+                });
+                r.f1((args) -> {
+                    expect(((JSObject)args[0]).call("check", 1)).toEqual(true);
+                    i.addAndGet(32);
+                    return proxy.executeScript(JSBidule.class, "new JSBidule(11)");
+                });
+                r.f2((args) -> {
+                    expect(((JSObject)args[0]).call("check", 2)).toEqual(true);
+                    expect(((JSObject)args[1]).call("check", 3)).toEqual(true);
+                    i.addAndGet(64);
+                    return null;
+                });
+                r.f3((args) -> {
+                    expect(((JSObject)args[0]).call("check", 4)).toEqual(true);
+                    expect(((JSObject)args[1]).call("check", 5)).toEqual(true);
+                    expect(((JSObject)args[2]).call("check", 6)).toEqual(true);
+                    i.addAndGet(128);
+                    return proxy.executeScript(JSBidule.class, "new JSBidule(33)");
+                });
+
+                JSObject result = r.runF();
+                expect(result.getMember("f0")).toBeNull();
+                expect(proxy.convertToJava(JSBidule.class, result.getMember("f1")).check(11)).toBeTrue();
+                expect(result.getMember("f2")).toBeNull();
+                expect(proxy.convertToJava(JSBidule.class, result.getMember("f3")).check(33)).toBeTrue();
+
+                expect(i.get()).toEqual(16 + 32 + 64 + 128);
+            });
+        });
+
+
+        describe("Calls with @RawArgument @This", () -> {
+            WebView webView = new WebView();
+            WebEngine engine = webView.getEngine();
+
+            WebkitFXProxy proxy = new WebkitFXProxy(engine);
+
+            RunnableTesterRawThis r = proxy.executeScript(RunnableTesterRawThis.class, WebkitFXProxy.class.getResource("Runnable.js"));
+
+
+            it("behaves correctly with JSRunnable", () -> {
+                AtomicInteger i = new AtomicInteger(0);
+                r.r0((self, args) -> {
+                    expect(r.isSame(self)).toBeTrue();
+                    i.addAndGet(1);
+                    expect(args.length).toEqual(0);
+                });
+                r.r1((self, args) -> {
+                    expect(r.isSame(self)).toBeTrue();
+                    expect(((JSObject)args[0]).call("check", 1)).toEqual(true);
+                    i.addAndGet(2);
+                });
+                r.r2((self, args) -> {
+                    expect(r.isSame(self)).toBeTrue();
+                    expect(((JSObject)args[0]).call("check", 2)).toEqual(true);
+                    expect(((JSObject)args[1]).call("check", 3)).toEqual(true);
+                    i.addAndGet(4);
+                });
+                r.r3((self, args) -> {
+                    expect(r.isSame(self)).toBeTrue();
+                    expect(((JSObject)args[0]).call("check", 4)).toEqual(true);
+                    expect(((JSObject)args[1]).call("check", 5)).toEqual(true);
+                    expect(((JSObject)args[2]).call("check", 6)).toEqual(true);
+
+                    i.addAndGet(8);
+                });
+
+                JSObject result = r.runR();
+                expect(result.getMember("r0") == proxy.undefined).toBeTrue();
+                expect(result.getMember("r1") == proxy.undefined).toBeTrue();
+                expect(result.getMember("r2") == proxy.undefined).toBeTrue();
+                expect(result.getMember("r3") == proxy.undefined).toBeTrue();
+
+                expect(i.get()).toEqual(1 + 2 + 4 + 8);
+            });
+
+
+            it("bahaves correctly with JSFunction", () -> {
+                AtomicInteger i = new AtomicInteger(0);
+
+                r.f0((self, args) -> {
+                    expect(r.isSame(self)).toBeTrue();
+                    i.addAndGet(16);
+                    expect(args.length).toEqual(0);
+                    return null;
+                });
+                r.f1((self, args) -> {
+                    expect(r.isSame(self)).toBeTrue();
+                    expect(((JSObject)args[0]).call("check", 1)).toEqual(true);
+                    i.addAndGet(32);
+                    return proxy.executeScript(JSBidule.class, "new JSBidule(11)");
+                });
+                r.f2((self, args) -> {
+                    expect(r.isSame(self)).toBeTrue();
+                    expect(((JSObject)args[0]).call("check", 2)).toEqual(true);
+                    expect(((JSObject)args[1]).call("check", 3)).toEqual(true);
+                    i.addAndGet(64);
+                    return null;
+                });
+                r.f3((self, args) -> {
+                    expect(r.isSame(self)).toBeTrue();
+                    expect(((JSObject)args[0]).call("check", 4)).toEqual(true);
+                    expect(((JSObject)args[1]).call("check", 5)).toEqual(true);
+                    expect(((JSObject)args[2]).call("check", 6)).toEqual(true);
+                    i.addAndGet(128);
+                    return proxy.executeScript(JSBidule.class, "new JSBidule(33)");
+                });
+
+                JSObject result = r.runF();
+                expect(result.getMember("f0")).toBeNull();
+                expect(proxy.convertToJava(JSBidule.class, result.getMember("f1")).check(11)).toBeTrue();
+                expect(result.getMember("f2")).toBeNull();
+                expect(proxy.convertToJava(JSBidule.class, result.getMember("f3")).check(33)).toBeTrue();
+
+                expect(i.get()).toEqual(16 + 32 + 64 + 128);
+            });
+        });
+
+
     }
 
     public static class FunctionPublisher {
@@ -323,8 +575,111 @@ public class WebkitFXProxyTest {
         @Setter
         void f3(JSFunction3<JSBidule, JSBidule, JSBidule, JSBidule> f);
 
-        JSObject run();
+        JSObject runR();
+
+        JSObject runF();
 
     }
+
+    @JSInterface
+    public interface RunnableTesterThis {
+        @Setter
+        void r0(@This JSRunnable1<RunnableTesterThis> r);
+
+        @Setter
+        void r1(@This JSRunnable2<RunnableTesterThis, JSBidule> r);
+
+        @Setter
+        void r2(@This JSRunnable3<RunnableTesterThis, JSBidule, JSBidule> r);
+
+        @Setter
+        void r3(@This JSRunnable4<RunnableTesterThis, JSBidule, JSBidule, JSBidule> r);
+
+        @Setter
+        void f0(@This JSFunction1<RunnableTesterThis, JSBidule> f);
+
+        @Setter
+        void f1(@This JSFunction2<RunnableTesterThis, JSBidule, JSBidule> f);
+
+        @Setter
+        void f2(@This JSFunction3<RunnableTesterThis, JSBidule, JSBidule, JSBidule> f);
+
+        @Setter
+        void f3(@This JSFunction4<RunnableTesterThis, JSBidule, JSBidule, JSBidule, JSBidule> f);
+
+        boolean isSame(RunnableTesterThis other);
+
+        JSObject runR();
+
+        JSObject runF();
+
+    }
+
+    @JSInterface
+    public interface RunnableTesterRawThis {
+        @Setter
+        void r0(@This @RawArguments JSRunnable2<RunnableTesterRawThis, Object[]> r);
+
+        @Setter
+        void r1(@This @RawArguments JSRunnable2<RunnableTesterRawThis, Object[]> r);
+
+        @Setter
+        void r2(@This @RawArguments JSRunnable2<RunnableTesterRawThis, Object[]> r);
+
+        @Setter
+        void r3(@This @RawArguments JSRunnable2<RunnableTesterRawThis, Object[]> r);
+
+        @Setter
+        void f0(@This @RawArguments JSFunction2<RunnableTesterRawThis, Object[], JSBidule> r);
+
+        @Setter
+        void f1(@This @RawArguments JSFunction2<RunnableTesterRawThis, Object[], JSBidule> r);
+
+        @Setter
+        void f2(@This @RawArguments JSFunction2<RunnableTesterRawThis, Object[], JSBidule> r);
+
+        @Setter
+        void f3(@This @RawArguments JSFunction2<RunnableTesterRawThis, Object[], JSBidule> r);
+
+        boolean isSame(RunnableTesterRawThis other);
+
+        JSObject runR();
+
+        JSObject runF();
+
+    }
+
+    @JSInterface
+    public interface RunnableTesterRaw {
+        @Setter
+        void r0(@RawArguments JSRunnable1<Object[]> r);
+
+        @Setter
+        void r1(@RawArguments JSRunnable1<Object[]> r);
+
+        @Setter
+        void r2(@RawArguments JSRunnable1<Object[]> r);
+
+        @Setter
+        void r3(@RawArguments JSRunnable1<Object[]> r);
+
+        @Setter
+        void f0(@RawArguments JSFunction1<Object[], JSBidule> r);
+
+        @Setter
+        void f1(@RawArguments JSFunction1<Object[], JSBidule> r);
+
+        @Setter
+        void f2(@RawArguments JSFunction1<Object[], JSBidule> r);
+
+        @Setter
+        void f3(@RawArguments JSFunction1<Object[], JSBidule> r);
+
+        JSObject runR();
+
+        JSObject runF();
+
+    }
+
 
 }
