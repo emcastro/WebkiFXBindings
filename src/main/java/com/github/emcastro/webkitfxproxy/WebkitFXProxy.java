@@ -54,6 +54,14 @@ public class WebkitFXProxy {
         this.engine = engine;
     }
 
+    public static JSObject jsObject(Object proxy) {
+        if (proxy instanceof JSObject) {
+            return (JSObject) proxy;
+        }
+        JSInvocationHandler invocationHandler = (JSInvocationHandler) Proxy.getInvocationHandler(proxy);
+        return invocationHandler.jsObject;
+    }
+
     public <T> T executeScript(Class<T> type, URL script) throws IOException {
         return executeScript(type, script.openStream());
     }
@@ -77,14 +85,6 @@ public class WebkitFXProxy {
         return (T) convertToJava(type, engine.executeScript(script));
     }
 
-    private static Class<?> toClass(Type type) {
-        if (type instanceof ParameterizedType) {
-            return (Class) ((ParameterizedType) type).getRawType();
-        } else {
-            return (Class) type;
-        }
-    }
-
     private Object convertFromJava(ParameterType type, Object value) {
         if (value == null) return null;
 
@@ -95,19 +95,22 @@ public class WebkitFXProxy {
 
             boolean hasThisAnnotation = false;
             boolean rawArguments = false;
+            boolean reportError = false;
             for (Annotation annotation : type.annotations) {
                 if (annotation instanceof This) {
                     hasThisAnnotation = true;
                 } else if (annotation instanceof RawArguments) {
                     rawArguments = true;
+                } else if (annotation instanceof SelfErrorReport) {
+                    reportError = true;
                 }
             }
 
             Object publisher;
             if (value instanceof JSFunction) {
-                publisher = new FunctionPublisher(hasThisAnnotation, rawArguments, toParameterizedType(type.type), (JSFunction) value);
+                publisher = new FunctionPublisher(hasThisAnnotation, rawArguments, reportError, toParameterizedType(type.type), (JSFunction) value);
             } else {
-                publisher = new RunnablePublisher(hasThisAnnotation, rawArguments, toParameterizedType(type.type), (JSRunnable) value);
+                publisher = new RunnablePublisher(hasThisAnnotation, rawArguments, reportError, toParameterizedType(type.type), (JSRunnable) value);
             }
 
             return java2js.call("call", null, publisher);
@@ -118,7 +121,7 @@ public class WebkitFXProxy {
 
     @SuppressWarnings("unchecked")
     public <T> JSArray<T> newArray(Class<T> type) {
-        return (JSArray<T>) convertToJava(new JSArraySyntheticType(type), newArray.call("call"));
+        return (JSArray<T>) convertToJava(new JSArraySyntheticType(type), newArray.call("call"), false);
     }
 
     @SafeVarargs
@@ -130,6 +133,22 @@ public class WebkitFXProxy {
             i++;
         }
         return array;
+    }
+
+    private static Class<?> toClass(Type type) {
+        if (type instanceof ParameterizedType) {
+            return (Class) ((ParameterizedType) type).getRawType();
+        } else {
+            return (Class) type;
+        }
+    }
+
+    private static Object[] toArray(JSObject args, int length) {
+        Object[] argArray = new Object[length];
+        for (int i = 0; i < length; i++) {
+            argArray[i] = args.getSlot(i);
+        }
+        return argArray;
     }
 
     private static ParameterizedType toParameterizedType(Type type) {
@@ -171,7 +190,7 @@ public class WebkitFXProxy {
     private static class JSArraySyntheticType implements ParameterizedType {
         Type[] types;
 
-        public JSArraySyntheticType(Class type) {
+        JSArraySyntheticType(Class type) {
             types = new Type[]{type};
         }
 
@@ -191,35 +210,77 @@ public class WebkitFXProxy {
         }
     }
 
-    public class FunctionPublisher {
-        public FunctionPublisher(boolean hasThis, boolean rawArgument, ParameterizedType type, JSFunction function) {
+    class Publisher<F extends WithArity> {
+        Publisher(boolean hasThis, boolean rawArgument, boolean reportError, ParameterizedType type, F function) {
             this.hasThis = hasThis;
             this.rawArgument = rawArgument;
+            this.reportError = reportError;
             this.type = type;
             this.function = function;
+            actualTypeArguments = type.getActualTypeArguments();
         }
 
         final boolean hasThis;
         final boolean rawArgument;
+        final boolean reportError;
         final ParameterizedType type;
-        final JSFunction function;
+        final Type[] actualTypeArguments;
+        final F function;
+
+        Object[] convert(Object self, JSObject args, int length) {
+            if (hasThis) length += 1;
+
+            if (function.arity() != length) {
+                throw new IllegalArgumentException("Calling argument count (" + length + ") " +
+                        "doesn't match function arity (" + function.arity() + ") - " + function.getClass());
+            }
+
+            Object[] converted = new Object[length];
+            if (hasThis) {
+                Type argType = actualTypeArguments[0];
+                converted[0] = convertToJava(argType, self, true);
+            }
+            for (int i = hasThis ? 1 : 0; i < length; i++) {
+                Type argType = actualTypeArguments[i];
+                converted[i] = convertToJava(argType, args.getSlot(hasThis ? i - 1 : i), true);
+            }
+            return converted;
+        }
+
+    }
+
+    public class FunctionPublisher extends Publisher<JSFunction> {
+
+        public FunctionPublisher(boolean hasThis, boolean rawArgument, boolean reportError, ParameterizedType type, JSFunction function) {
+            super(hasThis, rawArgument, reportError, type, function);
+        }
+
+
+        public Object invoke(Object self, JSObject args) {
+            if (reportError) {
+                try {
+                    return _invoke(self, args);
+                } catch (Exception e) {
+                    e.printStackTrace(); // TODO add a mechanism to customise error report
+                    return null;
+                }
+            } else {
+                return _invoke(self, args);
+            }
+        }
 
         @SuppressWarnings("unchecked")
-        public Object invoke(Object self, JSObject args) {
+        private Object _invoke(Object self, JSObject args) {
             int length = (int) args.getMember("length");
             if (rawArgument) {
-                Object[] argArray = new Object[length];
-                for (int i = 0; i < length; i++) {
-                    argArray[i] = args.getSlot(i);
-                }
+                Object[] argArray = toArray(args, length);
 
-                Type[] actualTypeArguments = type.getActualTypeArguments();
                 if (hasThis) {
                     Type thisType = actualTypeArguments[0];
                     return convertFromJava(
                             new ParameterType(
                                     actualTypeArguments[actualTypeArguments.length - 1]),
-                            ((JSFunction2) function).call(convertToJava(thisType, self), argArray));
+                            ((JSFunction2) function).call(convertToJava(thisType, self, true), argArray));
 
                 } else {
                     return convertFromJava(
@@ -228,76 +289,47 @@ public class WebkitFXProxy {
                             ((JSFunction1) function).call(argArray));
                 }
             } else {
-                if (hasThis) length += 1;
-
-                if (function.arity() != length) {
-                    throw new IllegalArgumentException("Calling argument count (" + length + ") " +
-                            "doesn't match function arity (" + function.arity() + ") - " + function.getClass());
-                }
-
-                Object[] converted = new Object[length];
-                Type[] actualTypeArguments = type.getActualTypeArguments();
-                if (hasThis) {
-                    Type argType = actualTypeArguments[0];
-                    converted[0] = convertToJava(argType, self);
-                }
-                for (int i = hasThis ? 1 : 0; i < length; i++) {
-                    Type argType = actualTypeArguments[i];
-                    converted[i] = convertToJava(argType, args.getSlot(hasThis ? i - 1 : i));
-                }
+                Object[] converted = convert(self, args, length);
                 return convertFromJava(
                         new ParameterType(actualTypeArguments[actualTypeArguments.length - 1]),
                         function.invoke(converted));
             }
         }
+
     }
 
-    public class RunnablePublisher {
-        public RunnablePublisher(boolean hasThis, boolean rawArgument, ParameterizedType type, JSRunnable function) {
-            this.hasThis = hasThis;
-            this.rawArgument = rawArgument;
-            this.type = type;
-            this.function = function;
+    public class RunnablePublisher extends Publisher<JSRunnable> {
+        RunnablePublisher(boolean hasThis, boolean rawArgument, boolean reportError, ParameterizedType type, JSRunnable function) {
+            super(hasThis, rawArgument, reportError, type, function);
         }
 
-        final boolean hasThis;
-        final boolean rawArgument;
-        final ParameterizedType type;
-        final JSRunnable function;
+        public void invoke(Object self, JSObject args) {
+            if (reportError) {
+                try {
+                    _invoke(self, args);
+                } catch (Exception e) {
+                    e.printStackTrace(); // TODO add a mechanism to customise error report
+                }
+            } else {
+                _invoke(self, args);
+            }
+        }
 
         @SuppressWarnings("unchecked")
-        public void invoke(Object self, JSObject args) {
+        private void _invoke(Object self, JSObject args) {
             int length = (int) args.getMember("length");
             if (rawArgument) {
-                Object[] argArray = new Object[length];
-                for (int i = 0; i < length; i++) {
-                    argArray[i] = args.getSlot(i);
-                }
+                Object[] argArray = toArray(args, length);
 
                 if (hasThis) {
-                    Type thisType = type.getActualTypeArguments()[0];
-                    ((JSRunnable2) function).call(convertToJava(thisType, self), argArray);
+                    JSRunnable2 runnable = (JSRunnable2) this.function;
+                    Type thisType = actualTypeArguments[0];
+                    runnable.call(convertToJava(thisType, self, true), argArray);
                 } else {
                     ((JSRunnable1) function).call(argArray);
                 }
             } else {
-                if (hasThis) length += 1;
-
-                if (function.arity() != length) {
-                    throw new IllegalArgumentException("Calling argument count (" + length + ") " +
-                            "doesn't match function arity (" + function.arity() + ") - " + function.getClass());
-                }
-
-                Object[] converted = new Object[length];
-                Type[] actualTypeArguments = type.getActualTypeArguments();
-                if (hasThis) {
-                    Type argType = actualTypeArguments[0];
-                    converted[0] = convertToJava(argType, self);
-                }
-                for (int i = hasThis ? 1 : 0; i < length; i++) {
-                    Type argType = actualTypeArguments[i];
-                    converted[i] = convertToJava(argType, args.getSlot(hasThis ? i - 1 : i));
-                }
+                Object[] converted = convert(self, args, length);
                 function.invoke(converted);
             }
         }
@@ -322,25 +354,35 @@ public class WebkitFXProxy {
     }
 
     public <T> T convertToJava(Class<T> returnType, Object value) {
-        return (T) convertToJava((Type) returnType, value);
+        return (T) convertToJava((Type) returnType, value, false);
     }
 
-    private Object convertToJava(Type returnType, Object value) {
+    private Object convertToJava(Type returnType, Object value, boolean acceptUndefined) {
         Class<?> returnClass = toClass(returnType);
 
-        if (value == undefined // identity comparison
-                && returnClass != JSObject.class
-                && returnClass != void.class
-                && returnClass != Void.class)
+        if (value == undefined) { // identity comparison
+            if (returnClass == JSObject.class
+                    || returnClass == void.class
+                    || returnClass == Void.class
+                    || acceptUndefined) {
+                return null;
+            }
             throw new JSException("Unexpected undefined value returned by Javascript. Awaiting " + returnClass.getName());
+        }
 
         if (returnClass.isAnnotationPresent(JSInterface.class)) {
             Class<?> clazz = toClass(returnType);
             return Proxy.newProxyInstance(loader, new Class[]{clazz}, new JSInvocationHandler((JSObject) value, returnType));
         } else if (returnClass.isAssignableFrom(Double.class) || returnClass.isAssignableFrom(double.class)) {
-            // convert integer to Double
+            // convert integer and long to Double
             if (value instanceof Integer) {
                 return ((Integer) value).doubleValue();
+            } else if (value instanceof Long) {
+                return ((Long) value).doubleValue();
+            } else return value;
+        } else if (returnClass.isAssignableFrom(Long.class) || returnClass.isAssignableFrom(long.class)) {
+            if (value instanceof Integer) {
+                return ((Integer) value).longValue();
             } else return value;
         } else {
             return value;
@@ -443,7 +485,7 @@ public class WebkitFXProxy {
                 checkArity(args, 0);
 
                 String name = jsName(method, "is", "get");
-                return convertToJava(returnType, jsObject.getMember(name));
+                return convertToJava(returnType, jsObject.getMember(name), method.isAnnotationPresent(Undefinedable.class));
 
             } else if (method.isAnnotationPresent(Setter.class)) {
                 checkArity(args, 1);
@@ -455,7 +497,7 @@ public class WebkitFXProxy {
             } else if (method.isAnnotationPresent(ArrayGetter.class)) {
                 checkArity(args, 1);
 
-                return convertToJava(returnType, jsObject.getSlot((int) args[0]));
+                return convertToJava(returnType, jsObject.getSlot((int) args[0]), method.isAnnotationPresent(Undefinedable.class));
 
             } else if (method.isAnnotationPresent(ArraySetter.class)) {
                 checkArity(args, 2);
@@ -487,7 +529,7 @@ public class WebkitFXProxy {
                         jsResult = ((JSObject) jsMethod).call("call", extendedArgs);
                     }
                 }
-                return convertToJava(returnType, jsResult);
+                return convertToJava(returnType, jsResult, method.isAnnotationPresent(Undefinedable.class));
             }
         }
 

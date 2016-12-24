@@ -128,6 +128,12 @@ public class WebkitFXProxyTest {
                 expect(crashed).toBeTrue();
             });
 
+            it("accepts undefined return value when told to", () -> {
+                Rectangle r = proxy.executeScript(Rectangle.class, "new Rectangle(undefined, 10)");
+                expect(r.widthOption()).toBeNull();
+                expect(r.getHeight()).toEqual(10.);
+            });
+
             it("has useful array support", () -> {
                 List<Double> result = Arrays.asList(1.0, 2.0, 3.0, 4.0);
                 JSArray<Rectangle> array = proxy.executeScript(JSArray_Rectangle.class, "[ new Rectangle(1,2), new Rectangle(3,4) ]");
@@ -320,18 +326,18 @@ public class WebkitFXProxyTest {
                     expect(args.length).toEqual(0);
                 });
                 r.r1((args) -> {
-                    expect(((JSObject)args[0]).call("check", 1)).toEqual(true);
+                    expect(((JSObject) args[0]).call("check", 1)).toEqual(true);
                     i.addAndGet(2);
                 });
                 r.r2((args) -> {
-                    expect(((JSObject)args[0]).call("check", 2)).toEqual(true);
-                    expect(((JSObject)args[1]).call("check", 3)).toEqual(true);
+                    expect(((JSObject) args[0]).call("check", 2)).toEqual(true);
+                    expect(((JSObject) args[1]).call("check", 3)).toEqual(true);
                     i.addAndGet(4);
                 });
                 r.r3((args) -> {
-                    expect(((JSObject)args[0]).call("check", 4)).toEqual(true);
-                    expect(((JSObject)args[1]).call("check", 5)).toEqual(true);
-                    expect(((JSObject)args[2]).call("check", 6)).toEqual(true);
+                    expect(((JSObject) args[0]).call("check", 4)).toEqual(true);
+                    expect(((JSObject) args[1]).call("check", 5)).toEqual(true);
+                    expect(((JSObject) args[2]).call("check", 6)).toEqual(true);
 
                     i.addAndGet(8);
                 });
@@ -355,20 +361,20 @@ public class WebkitFXProxyTest {
                     return null;
                 });
                 r.f1((args) -> {
-                    expect(((JSObject)args[0]).call("check", 1)).toEqual(true);
+                    expect(((JSObject) args[0]).call("check", 1)).toEqual(true);
                     i.addAndGet(32);
                     return proxy.executeScript(JSBidule.class, "new JSBidule(11)");
                 });
                 r.f2((args) -> {
-                    expect(((JSObject)args[0]).call("check", 2)).toEqual(true);
-                    expect(((JSObject)args[1]).call("check", 3)).toEqual(true);
+                    expect(((JSObject) args[0]).call("check", 2)).toEqual(true);
+                    expect(((JSObject) args[1]).call("check", 3)).toEqual(true);
                     i.addAndGet(64);
                     return null;
                 });
                 r.f3((args) -> {
-                    expect(((JSObject)args[0]).call("check", 4)).toEqual(true);
-                    expect(((JSObject)args[1]).call("check", 5)).toEqual(true);
-                    expect(((JSObject)args[2]).call("check", 6)).toEqual(true);
+                    expect(((JSObject) args[0]).call("check", 4)).toEqual(true);
+                    expect(((JSObject) args[1]).call("check", 5)).toEqual(true);
+                    expect(((JSObject) args[2]).call("check", 6)).toEqual(true);
                     i.addAndGet(128);
                     return proxy.executeScript(JSBidule.class, "new JSBidule(33)");
                 });
@@ -402,20 +408,20 @@ public class WebkitFXProxyTest {
                 });
                 r.r1((self, args) -> {
                     expect(r.isSame(self)).toBeTrue();
-                    expect(((JSObject)args[0]).call("check", 1)).toEqual(true);
+                    expect(((JSObject) args[0]).call("check", 1)).toEqual(true);
                     i.addAndGet(2);
                 });
                 r.r2((self, args) -> {
                     expect(r.isSame(self)).toBeTrue();
-                    expect(((JSObject)args[0]).call("check", 2)).toEqual(true);
-                    expect(((JSObject)args[1]).call("check", 3)).toEqual(true);
+                    expect(((JSObject) args[0]).call("check", 2)).toEqual(true);
+                    expect(((JSObject) args[1]).call("check", 3)).toEqual(true);
                     i.addAndGet(4);
                 });
                 r.r3((self, args) -> {
                     expect(r.isSame(self)).toBeTrue();
-                    expect(((JSObject)args[0]).call("check", 4)).toEqual(true);
-                    expect(((JSObject)args[1]).call("check", 5)).toEqual(true);
-                    expect(((JSObject)args[2]).call("check", 6)).toEqual(true);
+                    expect(((JSObject) args[0]).call("check", 4)).toEqual(true);
+                    expect(((JSObject) args[1]).call("check", 5)).toEqual(true);
+                    expect(((JSObject) args[2]).call("check", 6)).toEqual(true);
 
                     i.addAndGet(8);
                 });
@@ -441,22 +447,22 @@ public class WebkitFXProxyTest {
                 });
                 r.f1((self, args) -> {
                     expect(r.isSame(self)).toBeTrue();
-                    expect(((JSObject)args[0]).call("check", 1)).toEqual(true);
+                    expect(((JSObject) args[0]).call("check", 1)).toEqual(true);
                     i.addAndGet(32);
                     return proxy.executeScript(JSBidule.class, "new JSBidule(11)");
                 });
                 r.f2((self, args) -> {
                     expect(r.isSame(self)).toBeTrue();
-                    expect(((JSObject)args[0]).call("check", 2)).toEqual(true);
-                    expect(((JSObject)args[1]).call("check", 3)).toEqual(true);
+                    expect(((JSObject) args[0]).call("check", 2)).toEqual(true);
+                    expect(((JSObject) args[1]).call("check", 3)).toEqual(true);
                     i.addAndGet(64);
                     return null;
                 });
                 r.f3((self, args) -> {
                     expect(r.isSame(self)).toBeTrue();
-                    expect(((JSObject)args[0]).call("check", 4)).toEqual(true);
-                    expect(((JSObject)args[1]).call("check", 5)).toEqual(true);
-                    expect(((JSObject)args[2]).call("check", 6)).toEqual(true);
+                    expect(((JSObject) args[0]).call("check", 4)).toEqual(true);
+                    expect(((JSObject) args[1]).call("check", 5)).toEqual(true);
+                    expect(((JSObject) args[2]).call("check", 6)).toEqual(true);
                     i.addAndGet(128);
                     return proxy.executeScript(JSBidule.class, "new JSBidule(33)");
                 });
@@ -542,6 +548,12 @@ public class WebkitFXProxyTest {
         default String simpleFormatter() {
             return "rect:" + width() + "×" + getHeight();
         }
+
+        // support for undefined return value
+        @Getter
+        @Undefinedable
+        @JSName("width")
+        Double widthOption();
     }
 
     @JSInterface
