@@ -95,14 +95,14 @@ public class WebkitFXProxy {
 
             boolean hasThisAnnotation = false;
             boolean rawArguments = false;
-            boolean reportError = false;
+            boolean reportError = true;
             for (Annotation annotation : type.annotations) {
                 if (annotation instanceof This) {
                     hasThisAnnotation = true;
                 } else if (annotation instanceof RawArguments) {
                     rawArguments = true;
-                } else if (annotation instanceof SelfErrorReport) {
-                    reportError = true;
+                } else if (annotation instanceof ThrowException) {
+                    reportError = false;
                 }
             }
 
