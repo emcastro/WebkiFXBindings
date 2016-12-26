@@ -11,6 +11,8 @@ import java.lang.annotation.Annotation;
 import java.lang.invoke.MethodHandles;
 import java.lang.reflect.*;
 import java.net.URL;
+import java.util.ArrayList;
+import java.util.List;
 
 /**
  * Created by ecastro on 04/12/16.
@@ -33,6 +35,8 @@ public class WebkitFXProxy {
     final JSObject java2js;
     final JSObject newArray;
     final WebEngine engine;
+
+    final private List<Object> antiGC = new ArrayList<>();
 
     public WebkitFXProxy(WebEngine engine) {
         undefined = (String) engine.executeScript("undefined");
@@ -112,9 +116,11 @@ public class WebkitFXProxy {
             } else {
                 publisher = new RunnablePublisher(hasThisAnnotation, rawArguments, reportError, toParameterizedType(type.type), (JSRunnable) value);
             }
+            antiGC.add(publisher);
 
             return java2js.call("call", null, publisher);
         } else {
+            antiGC.add(value);
             return value;
         }
     }
@@ -541,7 +547,11 @@ public class WebkitFXProxy {
                     pType = (ParameterizedType) type;
                 } else {
                     // The user defined a non parametrized interface to encapsulate type parameters in a Class object?
-                    pType = (ParameterizedType) ((Class) type).getGenericInterfaces()[0];
+                    Type[] genericInterfaces = ((Class) type).getGenericInterfaces();
+                    if (genericInterfaces.length > 0)
+                        pType = (ParameterizedType) genericInterfaces[0];
+                    else
+                        return Object.class; // Will cause ClassCastException
                 }
                 TypeVariable[] typeParameters = ((Class) pType.getRawType()).getTypeParameters();
                 int i;
