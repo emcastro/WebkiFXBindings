@@ -390,6 +390,13 @@ public class WebkitFXProxy {
             if (value instanceof Integer) {
                 return ((Integer) value).longValue();
             } else return value;
+        } else if (returnClass.isAssignableFrom(Character.class) || returnClass.isAssignableFrom(char.class)) {
+            if (value instanceof Integer) {
+                int i = ((Integer) value);
+                char c = (char) i;
+                if (c != i) return value; // finally throw ClassCastException
+                return c;
+            } else return value;
         } else {
             return value;
         }
