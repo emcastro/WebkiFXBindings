@@ -77,5 +77,25 @@ void foo(Webview webview) {
 ```
 
 ## For more details
-see `WebkitFXProxyTest.java` in the tests.
+See `WebkitFXProxyTest.java` in the tests.
+
+## Use WebkitFXProxy in your project
+
+### Stable release
+
+Current stable release is 1.0.0.
+
+#### Maven coordinates
+
+| Group ID            | Artifact ID   | Version |
+| :-----------------: | :---------:   | :-----: |
+| com.github.emcastro | webkitfxproxy | 1.0.0   |
+
+#### Gradle example
+
+```groovy
+dependencies {
+    compile 'com.github.emcastro:webkitfxproxy:1.0.0'
+}
+```
 

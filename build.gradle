@@ -1,9 +1,7 @@
-version = '0.0.0-SNAPSHOT'
 
 apply plugin: 'java'
 apply plugin: 'maven'
 apply plugin: 'signing'
-apply plugin: 'osgi'
 
 repositories {
     mavenCentral()      
@@ -13,6 +11,8 @@ sourceCompatibility = '1.8'
 targetCompatibility = '1.8'
 
 group = 'com.github.emcastro'
+archivesBaseName = "webkitfxproxy"
+version = '1.0.0'
 
 dependencies {
     testCompile 'junit:junit:4.12'
@@ -50,31 +50,31 @@ signArchives.onlyIf {
     project.hasProperty('signing.keyId') && project.hasProperty('signing.password') && project.hasProperty('signing.secretKeyRingFile')
 }
 
-def doUploadArchives = project.hasProperty('sonatypeUsername') && project.hasProperty('sonatypePassword')
+def doUploadArchives = project.hasProperty('ossrhUsername') && project.hasProperty('ossrhPassword')
 
 if(doUploadArchives) {
     uploadArchives {
         repositories.mavenDeployer {
             beforeDeployment { MavenDeployment deployment -> signing.signPom(deployment) }
 
-            repository(url: "https://oss.sonatype.org/service/local/staging/deploy/maven2/") {
-              authentication(userName: sonatypeUsername, password: sonatypePassword)
+            repository(url: "https://oss.sonatype.org/service/local/staging/deploy/maven2") {
+              authentication(userName: ossrhUsername, password: ossrhPassword)
             }
 
             snapshotRepository(url: 'https://oss.sonatype.org/content/repositories/snapshots') {
-                authentication(userName: sonatypeUsername, password: sonatypePassword)
+                authentication(userName: ossrhUsername, password: ossrhPassword)
             }
 
             pom.project {
                 name 'webkitfxproxy'
                 packaging 'jar'
                 description 'Typed proxying for JavaFX Webkit objects.'
-                url 'http://www.github.com/com.github.emcastro/WebkitFXProxy'
+                url 'https://github.com/emcastro/WebkitFXProxy'
              
                 scm {
-                    url 'scm:git@github.com:com.github.emcastro/WebkitFXProxy.git'
-                    connection 'scm:git@github.com:com.github.emcastro/WebkitFXProxy.git'
-                    developerConnection 'scm:git@github.com:com.github.emcastro/WebkitFXProxy.git'
+                    url 'https://github.com/emcastro/WebkitFXProxy'
+                    connection 'https://github.com/emcastro/WebkitFXProxy.git'
+                    developerConnection 'git@github.com:emcastro/WebkitFXProxy.git'
                 }
              
                 licenses {
@@ -88,6 +88,7 @@ if(doUploadArchives) {
                 developers {
                     developer {
                         name 'Emmanuel Castro'
+                        email 'emmanuel.castro@laposte.net'
                     }
                 }
             }
